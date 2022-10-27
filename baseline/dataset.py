@@ -97,12 +97,12 @@ class AgeLabels(int, Enum):
         except Exception:
             raise ValueError(f"Age value should be numeric, {value}")
 
-        if value < 30:
-            return cls.YOUNG
-        elif value < 60:
+        if value > 54:
+            return cls.OLD
+        elif value > 24:
             return cls.MIDDLE
         else:
-            return cls.OLD
+            return cls.YOUNG
 
 
 class MaskBaseDataset(Dataset):
@@ -150,12 +150,6 @@ class MaskBaseDataset(Dataset):
 
                 id, gender, race, age = profile.split("_")
                 gender_label = GenderLabels.from_str(gender)
-                if int(age)>54:
-                    age='60'
-                elif int(age)>24:
-                    age='31'
-                else:
-                    pass
                 age_label = AgeLabels.from_number(age)
 
                 self.image_paths.append(img_path)
@@ -173,7 +167,6 @@ class MaskBaseDataset(Dataset):
                 image = np.array(Image.open(image_path)).astype(np.int32)
                 sums.append(image.mean(axis=(0, 1)))
                 squared.append((image ** 2).mean(axis=(0, 1)))
-
             self.mean = np.mean(sums, axis=0) / 255
             self.std = (np.mean(squared, axis=0) - self.mean ** 2) ** 0.5 / 255
 
@@ -285,12 +278,6 @@ class MaskSplitByProfileDataset(MaskBaseDataset):
 
                     id, gender, race, age = profile.split("_")
                     gender_label = GenderLabels.from_str(gender)
-                    if int(age)>54:
-                        age='60'
-                    elif int(age)>24:
-                        age='31'
-                    else:
-                        pass
                     age_label = AgeLabels.from_number(age)
                     self.image_paths.append(img_path)
                     self.mask_labels.append(mask_label)
