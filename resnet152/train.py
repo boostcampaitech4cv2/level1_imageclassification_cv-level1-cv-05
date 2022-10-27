@@ -108,14 +108,30 @@ def train(data_dir, model_dir, args):
 
     # -- data_loader
     train_set, val_set = dataset.split_dataset()
+    
+    if args.weightedsampler == 'yes':
+        # weighted random sampler
+        print("Data Class Distribution :", dataset.classes_hist)
+        classweights = 1 / torch.Tensor(dataset.classes_hist)
+        classweights = classweights.double()
+        MySampler = torch.utils.data.WeightedRandomSampler(
+            weights = classweights,
+            num_samples=dataset.__len__(),
+            replacement = True # cannot sample n_sample > prob_dist.size(-1) samples without replacement
+        )
+        DataLoadershuffle = False # Sampler option is mutually exclusive with shuffle.
+    else:
+        MySampler = None
+        DataLoadershuffle = True
 
     train_loader = DataLoader(
         train_set,
         batch_size=args.batch_size,
         num_workers=multiprocessing.cpu_count() // 2,
-        shuffle=True,
+        shuffle=DataLoadershuffle,
         pin_memory=use_cuda,
         drop_last=True,
+        sampler = MySampler
     )
 
     val_loader = DataLoader(
@@ -243,6 +259,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr_decay_step', type=int, default=20, help='learning rate scheduler deacy step (default: 20)')
     parser.add_argument('--log_interval', type=int, default=20, help='how many batches to wait before logging training status')
     parser.add_argument('--name', default='exp', help='model save at {SM_MODEL_DIR}/{name}')
+    parser.add_argument('--weightedsampler', type=str, default='no', help='weighted sampler (default: no, yes)')
 
     # Container environment
     parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_TRAIN', '/opt/ml/input/data/train/images'))
