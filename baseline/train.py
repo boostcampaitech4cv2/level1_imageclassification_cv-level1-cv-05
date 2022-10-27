@@ -11,6 +11,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+from torchmetrics import F1Score
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
@@ -150,13 +151,19 @@ def train(data_dir, model_dir, args):
     with open(os.path.join(save_dir, 'config.json'), 'w', encoding='utf-8') as f:
         json.dump(vars(args), f, ensure_ascii=False, indent=4)
 
+    # F1 Score
+    f1score = F1Score(num_classes = num_classes, average = 'macro')
+
     best_val_acc = 0
     best_val_loss = np.inf
+    best_val_f1 = 0
     for epoch in range(args.epochs):
         # train loop
         model.train()
         loss_value = 0
         matches = 0
+        predlist = torch.tensor([], dtype = torch.int32)
+        labellist = torch.tensor([], dtype = torch.int32)
         for idx, train_batch in enumerate(train_loader):
             inputs, labels = train_batch
             inputs = inputs.to(device)
@@ -168,6 +175,9 @@ def train(data_dir, model_dir, args):
             preds = torch.argmax(outs, dim=-1)
             loss = criterion(outs, labels)
 
+            predlist = torch.cat((predlist, preds.cpu()))
+            labellist = torch.cat((labellist, labels.cpu()))
+
             loss.backward()
             optimizer.step()
 
@@ -176,13 +186,15 @@ def train(data_dir, model_dir, args):
             if (idx + 1) % args.log_interval == 0:
                 train_loss = loss_value / args.log_interval
                 train_acc = matches / args.batch_size / args.log_interval
+                train_f1 = f1score(predlist, labellist).item()
                 current_lr = get_lr(optimizer)
                 print(
                     f"Epoch[{epoch}/{args.epochs}]({idx + 1}/{len(train_loader)}) || "
-                    f"training loss {train_loss:4.4} || training accuracy {train_acc:4.2%} || lr {current_lr}"
+                    f"training loss {train_loss:4.4} || training accuracy {train_acc:4.2%} || training f1 score {train_f1:4.4} || lr {current_lr}"
                 )
                 logger.add_scalar("Train/loss", train_loss, epoch * len(train_loader) + idx)
                 logger.add_scalar("Train/accuracy", train_acc, epoch * len(train_loader) + idx)
+                logger.add_scalar("Train/f1", train_f1, epoch * len(train_loader) + idx)
 
                 loss_value = 0
                 matches = 0
@@ -196,6 +208,8 @@ def train(data_dir, model_dir, args):
             val_loss_items = []
             val_acc_items = []
             figure = None
+            predlist = torch.tensor([], dtype = torch.int32)
+            labellist = torch.tensor([], dtype = torch.int32)
             for val_batch in val_loader:
                 inputs, labels = val_batch
                 inputs = inputs.to(device)
@@ -208,6 +222,8 @@ def train(data_dir, model_dir, args):
                 acc_item = (labels == preds).sum().item()
                 val_loss_items.append(loss_item)
                 val_acc_items.append(acc_item)
+                predlist = torch.cat((predlist, preds.cpu()))
+                labellist = torch.cat((labellist, labels.cpu()))
 
                 if figure is None:
                     inputs_np = torch.clone(inputs).detach().cpu().permute(0, 2, 3, 1).numpy()
@@ -218,18 +234,21 @@ def train(data_dir, model_dir, args):
 
             val_loss = np.sum(val_loss_items) / len(val_loader)
             val_acc = np.sum(val_acc_items) / len(val_set)
+            val_f1 = f1score(predlist, labellist).item()
             best_val_loss = min(best_val_loss, val_loss)
-            if val_acc > best_val_acc:
-                print(f"New best model for val accuracy : {val_acc:4.2%}! saving the best model..")
+            best_val_acc = max(best_val_acc, val_acc)
+            if val_f1 > best_val_f1:
+                print(f"New best model for val f1 score : {val_f1:4.2%}! saving the best model..")
                 torch.save(model.module.state_dict(), f"{save_dir}/best.pth")
-                best_val_acc = val_acc
+                best_val_f1 = val_f1
             torch.save(model.module.state_dict(), f"{save_dir}/last.pth")
             print(
-                f"[Val] acc : {val_acc:4.2%}, loss: {val_loss:4.2} || "
-                f"best acc : {best_val_acc:4.2%}, best loss: {best_val_loss:4.2}"
+                f"[Val] acc : {val_acc:4.2%}, f1 : {val_f1:4.4}, loss: {val_loss:4.2} || "
+                f"best acc : {best_val_acc:4.2%}, best f1 : {best_val_f1:4.4}, best loss: {best_val_loss:4.2}"
             )
             logger.add_scalar("Val/loss", val_loss, epoch)
             logger.add_scalar("Val/accuracy", val_acc, epoch)
+            logger.add_scalar("Val/f1", val_f1, epoch)
             logger.add_figure("results", figure, epoch)
             print()
 
