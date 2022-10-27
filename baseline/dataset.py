@@ -150,6 +150,12 @@ class MaskBaseDataset(Dataset):
 
                 id, gender, race, age = profile.split("_")
                 gender_label = GenderLabels.from_str(gender)
+                if int(age)>54:
+                    age='60'
+                elif int(age)>24:
+                    age='31'
+                else:
+                    pass
                 age_label = AgeLabels.from_number(age)
 
                 self.image_paths.append(img_path)
@@ -279,8 +285,13 @@ class MaskSplitByProfileDataset(MaskBaseDataset):
 
                     id, gender, race, age = profile.split("_")
                     gender_label = GenderLabels.from_str(gender)
+                    if int(age)>54:
+                        age='60'
+                    elif int(age)>24:
+                        age='31'
+                    else:
+                        pass
                     age_label = AgeLabels.from_number(age)
-
                     self.image_paths.append(img_path)
                     self.mask_labels.append(mask_label)
                     self.gender_labels.append(gender_label)
