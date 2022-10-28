@@ -405,7 +405,7 @@ def My_train(data_dir, model_dir,args):
             gen_matches += (gen_preds == gen_labels).sum().item()
             age_matches += (age_preds == gen_labels).sum().item()
             matches += (preds == labels).sum().item()
-            break
+
             if (idx + 1) % args.log_interval == 0:
                 predlist = mask_predlist*6 + gen_predlist*3 + age_predlist
                 labellist = mask_labellist*6 + gen_labellist*3 + age_labellist
