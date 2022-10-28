@@ -12,9 +12,7 @@ from dataset import TestDataset, MaskBaseDataset
 
 def load_model(saved_model, num_classes, device):
     model_cls = getattr(import_module("model"), args.model)
-    model = model_cls(
-        num_classes=num_classes
-    )
+    model = model_cls()
 
     # tarpath = os.path.join(saved_model, 'best.tar.gz')
     # tar = tarfile.open(tarpath, 'r:gz')
@@ -57,8 +55,9 @@ def inference(data_dir, model_dir, output_dir, args):
     with torch.no_grad():
         for idx, images in enumerate(loader):
             images = images.to(device)
-            pred = model(images)
-            pred = pred.argmax(dim=-1)
+            mask_pred,gen_pred,age_pred = model(images)
+            mask_outs,gen_outs,age_outs, = mask_pred.argmax(dim=-1),gen_pred.round(),age_pred.argmax(dim=-1)
+            pred=(mask_outs*6 + gen_outs*3 + age_outs).to(torch.int32)
             preds.extend(pred.cpu().numpy())
 
     info['ans'] = preds
@@ -73,11 +72,11 @@ if __name__ == '__main__':
     # Data and model checkpoints directories
     parser.add_argument('--batch_size', type=int, default=1000, help='input batch size for validing (default: 1000)')
     parser.add_argument('--resize', type=tuple, default=(96, 128), help='resize size for image when you trained (default: (96, 128))')
-    parser.add_argument('--model', type=str, default='BaseModel', help='model type (default: BaseModel)')
+    parser.add_argument('--model', type=str, default='MyModel', help='model type (default: BaseModel)')
 
     # Container environment
     parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_EVAL', '/opt/ml/input/data/eval'))
-    parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_CHANNEL_MODEL', './model/exp'))
+    parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_CHANNEL_MODEL', './model/exp5'))
     parser.add_argument('--output_dir', type=str, default=os.environ.get('SM_OUTPUT_DATA_DIR', './output'))
 
     args = parser.parse_args()

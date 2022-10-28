@@ -132,8 +132,7 @@ def train(data_dir, model_dir, args):
     # -- model
     model_module = getattr(import_module("model"), args.model)  # default: BaseModel
     model = model_module(
-        num_classes=num_classes
-    ).to(device)
+        num_classes=num_classes).to(device)
     model = torch.nn.DataParallel(model)
 
     # -- loss & metric
@@ -266,8 +265,7 @@ def My_train(data_dir, model_dir,args):
     # -- dataset
     dataset_module = getattr(import_module("dataset"), "Mydataset")  # default: MaskBaseDataset
     dataset = dataset_module(
-        data_dir=data_dir,
-    )
+        data_dir=data_dir,)
     num_classes = dataset.num_classes  # 18
 
     # -- augmentation
@@ -275,8 +273,7 @@ def My_train(data_dir, model_dir,args):
     transform = transform_module(
         resize=args.resize,
         mean=dataset.mean,
-        std=dataset.std,
-    )
+        std=dataset.std,)
     dataset.set_transform(transform)
 
     # -- data_loader
@@ -364,7 +361,7 @@ def My_train(data_dir, model_dir,args):
         for idx, train_batch in enumerate(train_loader):
             mask_optimizer.zero_grad(), gen_optimizer.zero_grad(), age_optimizer.zero_grad()
             inputs, mask_labels,gen_labels,age_labels = train_batch
-            inputs, mask_labels, gen_labels, age_labels =inputs.to(device), mask_labels.to(device), gen_labels.to(device), age_labels.to(device)
+            inputs, mask_labels, gen_labels, age_labels = inputs.to(device), mask_labels.to(device), gen_labels.to(device), age_labels.to(device)
             
             
             mask_outs, gen_outs, age_outs = model(inputs)
@@ -408,7 +405,7 @@ def My_train(data_dir, model_dir,args):
             
             mask_matches += (mask_preds == mask_labels).sum().item()
             gen_matches += (gen_preds == gen_labels).sum().item()
-            age_matches += (age_preds == gen_labels).sum().item()
+            age_matches += (age_preds == age_labels).sum().item()
             matches += (preds == labels).sum().item()
 
             if (idx + 1) % args.log_interval == 0:
@@ -421,7 +418,7 @@ def My_train(data_dir, model_dir,args):
                 gen_train_acc = gen_matches / args.batch_size / args.log_interval
                 age_train_acc = age_matches / args.batch_size / args.log_interval
                 
-                train_f1 = f1score(predlist, labellist).item()
+                train_f1 = f1score(predlist.to(torch.int32), labellist.to(torch.int32)).item()
                 current_lr = get_lr(mask_optimizer)
                 print(
                     f"Epoch[{epoch}/{args.epochs}]({idx + 1}/{len(train_loader)}) || "

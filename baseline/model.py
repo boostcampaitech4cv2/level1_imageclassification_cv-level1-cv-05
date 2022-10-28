@@ -38,11 +38,14 @@ class BaseModel(nn.Module):
 class MyModel(nn.Module):
     def __init__(self):
         super().__init__()
-        self.res = models.resnet152(pretrained=True)
-        self.freeze()
-        self.mask_model = nn.Linear(1000,3)
-        self.gen_model = nn.Linear(1000,1)
-        self.age_model = nn.Linear(1000,3)
+        self.res = models.resnet50(pretrained=True)
+        # self.freeze()
+        self.mask_model = nn.Sequential(nn.Linear(1000,128),nn.BatchNorm1d(128),nn.Softplus(beta = 2),
+                                        nn.Dropout(0.3),nn.Linear(128,3))
+        self.gen_model = nn.Sequential(nn.Linear(1000,128),nn.BatchNorm1d(128),nn.Softplus(beta = 2),
+                                        nn.Dropout(0.3),nn.Linear(128,1))
+        self.age_model = nn.Sequential(nn.Linear(1000,128),nn.BatchNorm1d(128),nn.Softplus(beta = 2),
+                                        nn.Dropout(0.3),nn.Linear(128,3))
         self.sig = nn.Sigmoid()
         """
         1. 위와 같이 생성자의 parameter 에 num_claases 를 포함해주세요.
