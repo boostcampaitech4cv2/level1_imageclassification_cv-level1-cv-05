@@ -1,5 +1,6 @@
 import torch.nn as nn
 import torch.nn.functional as F
+import timm
 
 
 class BaseModel(nn.Module):
@@ -50,3 +51,9 @@ class MyModel(nn.Module):
         2. 결과로 나온 output 을 return 해주세요
         """
         return x
+
+
+def ViT(num_classes):
+    model = timm.create_model('vit_large_patch16_224', pretrained = True)
+    model.head = nn.Linear(in_features = 1024, out_features = num_classes)
+    return model
