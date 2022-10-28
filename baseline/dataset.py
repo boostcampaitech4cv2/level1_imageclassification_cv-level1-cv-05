@@ -3,6 +3,7 @@ import random
 from collections import defaultdict
 from enum import Enum
 from typing import Tuple, List
+import random
 
 import numpy as np
 import torch
@@ -122,6 +123,7 @@ class MaskBaseDataset(Dataset):
     mask_labels = []
     gender_labels = []
     age_labels = []
+    total_labels = []
 
     def __init__(self, data_dir, mean=(0.548, 0.504, 0.479), std=(0.237, 0.247, 0.246), val_ratio=0.2):
         self.data_dir = data_dir
@@ -153,13 +155,15 @@ class MaskBaseDataset(Dataset):
                 gender_label = GenderLabels.from_str(gender)
                 age_label = AgeLabels.from_number(age)
 
+                total_label = self.encode_multi_class(mask_label, gender_label, age_label)
+
                 self.image_paths.append(img_path)
                 self.mask_labels.append(mask_label)
                 self.gender_labels.append(gender_label)
                 self.age_labels.append(age_label)
-
-                index = self.encode_multi_class(mask_label, gender_label, age_label)
-                self.classes_hist[index] = self.classes_hist[index] + 1
+                self.total_labels.append(total_label)
+                
+                self.classes_hist[total_label] = self.classes_hist[total_label] + 1
 
 
     def calc_statistics(self):
@@ -237,6 +241,31 @@ class MaskBaseDataset(Dataset):
         n_val = int(len(self) * self.val_ratio)
         n_train = len(self) - n_val
         train_set, val_set = random_split(self, [n_train, n_val])
+        return train_set, val_set
+    
+
+class MaskStratifiedDataset(MaskBaseDataset):
+    """
+        train / val 나누는 기준을 class의 비율을 유지하면서 나눕니다.
+    """
+
+    def __init__(self, data_dir, mean=(0.548, 0.504, 0.479), std=(0.237, 0.247, 0.246), val_ratio=0.2):
+        super().__init__(data_dir, mean, std, val_ratio)
+    
+    def split_dataset(self) -> Tuple[Subset, Subset]:
+        indices_per_label = defaultdict(list)
+        for index, label in enumerate(self.total_labels):
+            indices_per_label[label].append(index)
+        val_set_indices, train_set_indices = list(), list()
+        for label, indices in indices_per_label.items():
+            n_samples_for_label = round(len(indices) * self.val_ratio)
+            random_indices_sample = random.sample(indices, n_samples_for_label)
+            val_set_indices.extend(random_indices_sample)
+            train_set_indices.extend(set(indices) - set(random_indices_sample))
+        val_set = Subset(self, val_set_indices)
+        # first_set_labels = list(map(self.total_labels.__getitem__, first_set_indices))
+        train_set = Subset(self, train_set_indices)
+        # secound_set_labels = list(map(self.total_labels.__getitem__, second_set_indices))
         return train_set, val_set
 
 
