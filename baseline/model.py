@@ -38,7 +38,7 @@ class BaseModel(nn.Module):
 class MyModel(nn.Module):
     def __init__(self):
         super().__init__()
-        self.res = models.resnet101(pretrained=True)
+        self.res = models.resnet1(pretrained=True)
         
         # self.freeze()
         self.mask_model = nn.Sequential(nn.Linear(1000,64),nn.BatchNorm1d(64),nn.Softplus(beta = 2),

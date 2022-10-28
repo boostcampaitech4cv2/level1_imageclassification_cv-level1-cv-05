@@ -97,7 +97,7 @@ class AgeLabels(int, Enum):
         except Exception:
             raise ValueError(f"Age value should be numeric, {value}")
 
-        if value > 54:
+        if value > 58:
             return cls.OLD
         elif value > 29:
             return cls.MIDDLE
@@ -118,11 +118,7 @@ class MaskBaseDataset(Dataset):
         "normal": MaskLabels.NORMAL
     }
 
-    image_paths = []
-    mask_labels = []
-    gender_labels = []
-    age_labels = []
-
+    
     def __init__(self, data_dir, mean=(0.548, 0.504, 0.479), std=(0.237, 0.247, 0.246), val_ratio=0.2):
         self.data_dir = data_dir
         self.mean = mean
@@ -130,6 +126,11 @@ class MaskBaseDataset(Dataset):
         self.val_ratio = val_ratio
 
         self.transform = None
+        self.image_paths = []
+        self.mask_labels = []
+        self.gender_labels = []
+        self.age_labels = []
+
         self.setup()
         self.calc_statistics()
 
@@ -149,11 +150,11 @@ class MaskBaseDataset(Dataset):
                 mask_label = self._file_names[_file_name]
                 id, gender, race, age = profile.split("_")
                 gender_label = GenderLabels.from_str(gender)
-                age_label = AgeLabels.from_number(age)
+                # age_label = AgeLabels.from_number(age)
                 self.image_paths.append(img_path)
                 self.mask_labels.append(mask_label)
                 self.gender_labels.append(gender_label)
-                self.age_labels.append(age_label)
+                self.age_labels.append(int(age))
 
     def calc_statistics(self):
         has_statistics = self.mean is not None and self.std is not None
@@ -304,6 +305,29 @@ class Mydataset(MaskBaseDataset):
         return image_transform, mask_label,gender_label,age_label
     def __len__(self):
         return len(self.image_paths)
+    def age_label(self, age=60):
+        x = []
+        for i in self.age_labels:
+            if i > age - 1:
+                x.append(2)
+            elif i >=30:
+                x.append(1)
+            else :
+                x.append(0)
+        self.age_labels = x[:]
+    def split_dataset(self,old=60) -> Tuple[Subset, Subset]:
+            """
+            데이터셋을 train 과 val 로 나눕니다,
+            pytorch 내부의 torch.utils.data.random_split 함수를 사용하여
+            torch.utils.data.Subset 클래스 둘로 나눕니다.
+            구현이 어렵지 않으니 구글링 혹은 IDE (e.g. pycharm) 의 navigation 기능을 통해 코드를 한 번 읽어보는 것을 추천드립니다^^
+            """
+            self.age_label(old)
+            n_val = int(len(self) * self.val_ratio)
+            n_train = len(self) - n_val
+            train_set, val_set = random_split(self, [n_train, n_val])
+            return train_set, val_set
+
 class TestDataset(Dataset):
     def __init__(self, img_paths, resize, mean=(0.548, 0.504, 0.479), std=(0.237, 0.247, 0.246)):
         self.img_paths = img_paths
