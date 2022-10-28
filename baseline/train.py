@@ -118,7 +118,7 @@ def train(data_dir, model_dir, args):
         classweights = classweights.double()
         MySampler = torch.utils.data.WeightedRandomSampler(
             weights = classweights,
-            num_samples=dataset.__len__(),
+            num_samples=train_set.__len__(),
             replacement = True # cannot sample n_sample > prob_dist.size(-1) samples without replacement
         )
         DataLoadershuffle = False # Sampler option is mutually exclusive with shuffle.
