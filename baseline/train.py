@@ -111,13 +111,29 @@ def train(data_dir, model_dir, args):
     # -- data_loader
     train_set, val_set = dataset.split_dataset()
 
+    if args.weightedsampler == 'yes':
+        # weighted random sampler
+        print("Data Class Distribution :", dataset.classes_hist)
+        classweights = 1 / torch.Tensor(dataset.classes_hist)
+        classweights = classweights.double()
+        MySampler = torch.utils.data.WeightedRandomSampler(
+            weights = classweights,
+            num_samples=dataset.__len__(),
+            replacement = True # cannot sample n_sample > prob_dist.size(-1) samples without replacement
+        )
+        DataLoadershuffle = False # Sampler option is mutually exclusive with shuffle.
+    else:
+        MySampler = None
+        DataLoadershuffle = True
+
     train_loader = DataLoader(
         train_set,
         batch_size=args.batch_size,
         num_workers=multiprocessing.cpu_count() // 2,
-        shuffle=True,
+        shuffle=DataLoadershuffle,
         pin_memory=use_cuda,
         drop_last=True,
+        sampler = MySampler,
     )
 
     val_loader = DataLoader(

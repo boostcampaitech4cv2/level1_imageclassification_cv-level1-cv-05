@@ -129,6 +129,7 @@ class MaskBaseDataset(Dataset):
         self.std = std
         self.val_ratio = val_ratio
 
+        self.classes_hist = np.zeros(self.num_classes)
         self.transform = None
         self.setup()
         self.calc_statistics()
@@ -156,6 +157,10 @@ class MaskBaseDataset(Dataset):
                 self.mask_labels.append(mask_label)
                 self.gender_labels.append(gender_label)
                 self.age_labels.append(age_label)
+
+                index = self.encode_multi_class(mask_label, gender_label, age_label)
+                self.classes_hist[index] = self.classes_hist[index] + 1
+
 
     def calc_statistics(self):
         has_statistics = self.mean is not None and self.std is not None
