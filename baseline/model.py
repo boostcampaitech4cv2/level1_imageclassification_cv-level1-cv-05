@@ -38,14 +38,15 @@ class BaseModel(nn.Module):
 class MyModel(nn.Module):
     def __init__(self):
         super().__init__()
-        self.res = models.resnet50(pretrained=True)
+        self.res = models.resnet101(pretrained=True)
+        
         # self.freeze()
-        self.mask_model = nn.Sequential(nn.Linear(1000,128),nn.BatchNorm1d(128),nn.Softplus(beta = 2),
-                                        nn.Dropout(0.3),nn.Linear(128,3))
-        self.gen_model = nn.Sequential(nn.Linear(1000,128),nn.BatchNorm1d(128),nn.Softplus(beta = 2),
-                                        nn.Dropout(0.3),nn.Linear(128,1))
-        self.age_model = nn.Sequential(nn.Linear(1000,128),nn.BatchNorm1d(128),nn.Softplus(beta = 2),
-                                        nn.Dropout(0.3),nn.Linear(128,3))
+        self.mask_model = nn.Sequential(nn.Linear(1000,64),nn.BatchNorm1d(64),nn.Softplus(beta = 2),
+                                        nn.Dropout(0.5),nn.Linear(64,3))
+        self.gen_model = nn.Sequential(nn.Linear(1000,64),nn.BatchNorm1d(64),nn.Softplus(beta = 2),
+                                        nn.Dropout(0.5),nn.Linear(64,1))
+        self.age_model = nn.Sequential(nn.Linear(1000,64),nn.BatchNorm1d(64),nn.Softplus(beta = 2),
+                                        nn.Dropout(0.5),nn.Linear(64,3))
         self.sig = nn.Sigmoid()
         """
         1. 위와 같이 생성자의 parameter 에 num_claases 를 포함해주세요.
@@ -55,6 +56,7 @@ class MyModel(nn.Module):
     def freeze(self, a = False):
         for i in self.res.parameters():
             i.requires_grad = a
+    
         
 
     def forward(self, x):
