@@ -323,13 +323,14 @@ def My_train(data_dir, model_dir,args):
         {"params" : model.module.age_model.parameters()}],
         lr=args.lr,weight_decay=5e-4)    
     
-    """ resnet을 freeze 하지 않을 시 
+    """ backbone을 freeze 하지 않을 시 
     mask_optimizer = opt_module([
         {"params" : model.module.res.parameters(),'lr' : 1e-5},
         {"params" : model.module.mask_model.parameters()}],
         lr=args.lr,weight_decay=5e-4)"""
         
-    """mask_optimizer = opt_module(
+    """ freeze 할 때
+    mask_optimizer = opt_module(
         filter(lambda p: p.requires_grad, model.module.mask_model.parameters()),
         lr=args.lr,weight_decay=5e-4)#model.mask_model is expected nn.Sequential
     gen_optimizer = opt_module(
@@ -361,21 +362,18 @@ def My_train(data_dir, model_dir,args):
         mask_predlist, gen_predlist, age_predlist = torch.tensor([], dtype = torch.int32), torch.tensor([], dtype = torch.int32), torch.tensor([], dtype = torch.int32)
         mask_labellist, gen_labellist, age_labellist = torch.tensor([], dtype = torch.int32), torch.tensor([], dtype = torch.int32), torch.tensor([], dtype = torch.int32)
         for idx, train_batch in enumerate(train_loader):
-            inputs, mask_labels,gen_labels,age_labels = train_batch
-            inputs = inputs.to(device)
-            mask_labels, gen_labels, age_labels = mask_labels.to(device), gen_labels.to(device), age_labels.to(device)
             mask_optimizer.zero_grad(), gen_optimizer.zero_grad(), age_optimizer.zero_grad()
-            
-            mask_outs,gen_outs,age_outs = model(inputs)
-            # print(mask_outs.shape, mask_labels.shape,gen_outs.shape, gen_labels.shape)
-            
-            mask_preds,gen_preds, age_preds = torch.argmax(mask_outs, dim=-1),gen_outs.round(),torch.argmax(age_outs, dim=-1) 
+            inputs, mask_labels,gen_labels,age_labels = train_batch
+            inputs, mask_labels, gen_labels, age_labels =inputs.to(device), mask_labels.to(device), gen_labels.to(device), age_labels.to(device)
             
             
-            # mask_loss, gen_loss, age_loss= mask_criterion(mask_outs, mask_labels),gen_criterion(gen_outs, gen_labels),age_criterion(age_outs, age_labels)
-            mask_loss= mask_criterion(mask_outs, mask_labels)
-            gen_loss=gen_criterion(gen_outs, gen_labels.to(torch.float32))
-            age_loss=age_criterion(age_outs, age_labels)
+            mask_outs, gen_outs, age_outs = model(inputs)
+            mask_preds, gen_preds, age_preds = torch.argmax(mask_outs, dim=-1),gen_outs.round(),torch.argmax(age_outs, dim=-1) 
+            
+            
+            mask_loss, gen_loss, age_loss = (mask_criterion(mask_outs, mask_labels), 
+                                            gen_criterion(gen_outs, gen_labels.to(torch.float32)),
+                                            age_criterion(age_outs, age_labels))
             
             mask_predlist = torch.cat((mask_predlist, mask_preds.cpu()))
             mask_labellist = torch.cat((mask_labellist, mask_labels.cpu()))
@@ -391,6 +389,8 @@ def My_train(data_dir, model_dir,args):
             
             predlist = torch.cat((predlist, preds.cpu()))
             labellist = torch.cat((labellist, labels.cpu()))
+            
+            # when backbone is not frozen 
             with torch.autograd.set_detect_anomaly(True):
                 mask_loss.backward(retain_graph=True)
                 gen_loss.backward(retain_graph=True)
@@ -398,6 +398,11 @@ def My_train(data_dir, model_dir,args):
                 mask_optimizer.step()
                 gen_optimizer.step()
                 age_optimizer.step()
+            # when back bone is frozen
+            """
+            mask_loss.backwart(),gen_loss.backwart(),age_loss.backwart()
+            mask_optimizer.step(),gen_optimizer.step(),age_optimizer.step()
+            """
             
             loss_value += (mask_loss.item() + gen_loss.item() + age_loss.item())
             
@@ -451,15 +456,21 @@ def My_train(data_dir, model_dir,args):
                 mask_labels, gen_labels, age_labels = mask_labels.to(device), gen_labels.to(device), age_labels.to(device)
 
                 mask_outs, gen_outs, age_outs = model(inputs)
-                mask_preds, gen_preds, age_preds = torch.argmax(mask_outs, dim=-1), gen_outs.round() , torch.argmax(age_outs, dim=-1) 
-                mask_loss, gen_loss, age_loss= mask_criterion(mask_outs, mask_labels),gen_criterion(gen_outs, gen_labels.to(torch.float32)),age_criterion(age_outs, age_labels)
+                mask_preds, gen_preds, age_preds = (torch.argmax(mask_outs, dim=-1), gen_outs.round(),
+                                                    torch.argmax(age_outs, dim=-1) )
+                mask_loss, gen_loss, age_loss= (mask_criterion(mask_outs, mask_labels),
+                                                gen_criterion(gen_outs, gen_labels.to(torch.float32)),
+                                                age_criterion(age_outs, age_labels))
                 
                 loss_item = mask_loss.item() + gen_loss.item() + age_loss.item()
                 acc_item = ((mask_labels*6 + gen_labels*3 + age_labels) == (mask_preds*6 + gen_preds*3 + age_preds)).sum().item()
-                mask_acc, gen_acc, age_acc = (mask_preds == mask_labels).sum().item(),(gen_preds == gen_labels).sum().item(),(age_preds == age_labels).sum().item()
+                mask_acc, gen_acc, age_acc = ((mask_preds == mask_labels).sum().item(),
+                                                (gen_preds == gen_labels).sum().item(),
+                                                (age_preds == age_labels).sum().item())
                 
                 val_loss_items.append(loss_item)
                 val_acc_items.append(acc_item)
+                
                 val_mask_items.append(mask_acc)
                 val_gen_items.append(gen_acc)
                 val_age_items.append(age_acc)
