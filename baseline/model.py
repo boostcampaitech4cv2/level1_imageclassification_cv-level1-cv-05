@@ -38,36 +38,25 @@ class BaseModel(nn.Module):
 class MyModel(nn.Module):
     def __init__(self):
         super().__init__()
-        self.res = models.resnet1(pretrained=True)
-        
-        # self.freeze()
-        self.mask_model = nn.Sequential(nn.Linear(1000,64),nn.BatchNorm1d(64),nn.Softplus(beta = 2),
-                                        nn.Dropout(0.5),nn.Linear(64,3))
-        self.gen_model = nn.Sequential(nn.Linear(1000,64),nn.BatchNorm1d(64),nn.Softplus(beta = 2),
-                                        nn.Dropout(0.5),nn.Linear(64,1))
-        self.age_model = nn.Sequential(nn.Linear(1000,64),nn.BatchNorm1d(64),nn.Softplus(beta = 2),
-                                        nn.Dropout(0.5),nn.Linear(64,3))
-        self.sig = nn.Sigmoid()
+        self.res = models.resnet50(pretrained=True)
+        self.res.fc = nn.Linear(2048, 1024)
+        self.add_fc = nn.Linear(1024, 512)
+        self.out_fc = nn.Linear(512, 1)
+        self.relu = nn.ReLU()
         """
         1. 위와 같이 생성자의 parameter 에 num_claases 를 포함해주세요.
         2. 나만의 모델 아키텍쳐를 디자인 해봅니다.
         3. 모델의 output_dimension 은 num_classes 로 설정해주세요.
         """
-    def freeze(self, a = False):
-        for i in self.res.parameters():
-            i.requires_grad = a
-    
-        
 
     def forward(self, x):
         """
         1. 위에서 정의한 모델 아키텍쳐를 forward propagation 을 진행해주세요
         2. 결과로 나온 output 을 return 해주세요
         """
-        x = self.res(x)
-        out1 =self.mask_model(x)
-        out2 =self.sig(self.gen_model(x)).view(-1)
-        out3 =self.age_model(x)
+        out = self.relu(self.res(x))
+        out = self.relu(self.add_fc(out))
+        out = self.out_fc(out)
         # print(out2)
         # print(out2.type())
-        return out1, out2, out3
+        return out

@@ -71,7 +71,8 @@ _criterion_entrypoints = {
     'focal': FocalLoss,
     'label_smoothing': LabelSmoothingLoss,
     'f1': F1Loss,
-    'BCE' : nn.BCELoss
+    'BCE' : nn.BCELoss,
+    'mse' : nn.MSELoss
 }
 
 

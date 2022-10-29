@@ -64,26 +64,24 @@ def My_train(data_dir, model_dir,args):
     model = model_module().to(device)
 
     model = torch.nn.DataParallel(model)
-    model.module.freeze(True)
+    # model.module.freeze(True)
     # -- loss & metric
-    mask_criterion = create_criterion(args.criterion)
-    gen_criterion = create_criterion("BCE")# default: cross_entropy
+    # mask_criterion = create_criterion(args.criterion)
+    # gen_criterion = create_criterion("BCE")# default: cross_entropy
     age_criterion = create_criterion(args.criterion)
     
     opt_module = getattr(import_module("torch.optim"), args.optimizer)  # default: SGD
-    mask_optimizer = opt_module([
-        {"params" : model.module.res.parameters(),'lr' : 1e-4},
-        {"params" : model.module.mask_model.parameters()}],
-        lr=args.lr,weight_decay=0)
+    # mask_optimizer = opt_module([
+    #     {"params" : model.module.res.parameters(),'lr' : 1e-4},
+    #     {"params" : model.module.mask_model.parameters()}],
+    #     lr=args.lr,weight_decay=0)
 
-    gen_optimizer = opt_module([
-        {"params" : model.module.res.parameters(),'lr' : 1e-4},
-        {"params" : model.module.gen_model.parameters()}],
-        lr=args.lr,weight_decay=0)
-    age_optimizer = opt_module([
-        {"params" : model.module.res.parameters(),'lr' : 1e-4},
-        {"params" : model.module.age_model.parameters()}],
-        lr=args.lr,weight_decay=0)    
+    # gen_optimizer = opt_module([
+    #     {"params" : model.module.res.parameters(),'lr' : 1e-4},
+    #     {"params" : model.module.gen_model.parameters()}],
+    #     lr=args.lr,weight_decay=0)
+    age_optimizer = opt_module(model.parameters(),
+        lr=args.lr,weight_decay=5e-4)    
     
     """ backbone을 freeze 하지 않을 시 
     mask_optimizer = opt_module([
@@ -101,7 +99,7 @@ def My_train(data_dir, model_dir,args):
     age_optimizer = opt_module(
         filter(lambda p: p.requires_grad, model.module.age_model.parameters()),
         lr=args.lr,weight_decay=5e-4)"""
-    mask_scheduler, gen_scheduler, age_scheduler = StepLR(mask_optimizer, args.lr_decay_step, gamma=0.5), StepLR(gen_optimizer, args.lr_decay_step, gamma=0.5), StepLR(age_optimizer, args.lr_decay_step, gamma=0.5)
+    age_scheduler = StepLR(mask_optimizer, args.lr_decay_step, gamma=0.5)
     
     # -- logging
     logger = SummaryWriter(log_dir=save_dir)
@@ -109,11 +107,11 @@ def My_train(data_dir, model_dir,args):
         json.dump(vars(args), f, ensure_ascii=False, indent=4)
 
     # F1 Score
-    f1score = F1Score(num_classes = num_classes, average = 'macro')
+    # f1score = F1Score(num_classes = num_classes, average = 'macro')
 
-    best_val_acc = 0
+    # best_val_acc = 0
     best_val_loss = np.inf
-    best_val_f1 = 0
+    # best_val_f1 = 0
     for epoch in range(args.epochs):
         # train loop
         if epoch == 5:
