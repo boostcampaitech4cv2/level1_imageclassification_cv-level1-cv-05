@@ -126,6 +126,8 @@ class MaskBaseDataset(Dataset):
         self.gender_labels = []
         self.age_labels = []
         self.total_labels = []
+        self.train_idxs_in_dataset = None
+        self.val_idxs_in_dataset = None
 
         self.data_dir = data_dir
         self.mean = mean
@@ -263,9 +265,11 @@ class MaskStratifiedDataset(MaskBaseDataset):
             random_indices_sample = random.sample(indices, n_samples_for_label)
             val_set_indices.extend(random_indices_sample)
             train_set_indices.extend(set(indices) - set(random_indices_sample))
+        train_set = Subset(self, train_set_indices)
         val_set = Subset(self, val_set_indices)
         # first_set_labels = list(map(self.total_labels.__getitem__, first_set_indices))
-        train_set = Subset(self, train_set_indices)
+        self.train_idxs_in_dataset = train_set_indices
+        self.val_idxs_in_dataset = val_set_indices
         # secound_set_labels = list(map(self.total_labels.__getitem__, second_set_indices))
         return train_set, val_set
 
