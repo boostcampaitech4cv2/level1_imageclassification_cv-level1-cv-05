@@ -115,11 +115,12 @@ def My_train(data_dir, model_dir,args):
     best_val_acc = 0
     best_val_loss = np.inf
     best_val_f1 = 0
+    losslist = [args.criterion,'cross_entropy']
     for epoch in range(args.epochs):
         # train loop
-        if epoch == args.epochs//2:
-            age_criterion = create_criterion('f1')
-            mask_criterion = create_criterion('f1')
+        if epoch %5 == 0 and epoch > 1:
+            age_criterion = create_criterion(losslist[epoch%2])
+            mask_criterion = create_criterion(losslist[epoch%2])
         model.train()
         loss_value = 0
         matches = 0
