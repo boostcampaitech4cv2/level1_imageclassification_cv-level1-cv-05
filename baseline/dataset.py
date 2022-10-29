@@ -97,7 +97,7 @@ class AgeLabels(int, Enum):
         except Exception:
             raise ValueError(f"Age value should be numeric, {value}")
 
-        if value > 58:
+        if value > 56:
             return cls.OLD
         elif value > 29:
             return cls.MIDDLE
@@ -150,11 +150,11 @@ class MaskBaseDataset(Dataset):
                 mask_label = self._file_names[_file_name]
                 id, gender, race, age = profile.split("_")
                 gender_label = GenderLabels.from_str(gender)
-                # age_label = AgeLabels.from_number(age)
+                age_label = AgeLabels.from_number(age)
                 self.image_paths.append(img_path)
                 self.mask_labels.append(mask_label)
                 self.gender_labels.append(gender_label)
-                self.age_labels.append(int(age))
+                self.age_labels.append(age_label)
 
     def calc_statistics(self):
         has_statistics = self.mean is not None and self.std is not None
@@ -294,7 +294,6 @@ class Mydataset(MaskBaseDataset):
         super().__init__(data_dir,mean=mean,std=std,val_ratio=val_ratio)
     def __getitem__(self,index):
         assert self.transform is not None, ".set_tranform 메소드를 이용하여 transform 을 주입해주세요"
-
         image = self.read_image(index)
         mask_label = self.get_mask_label(index)
         gender_label = self.get_gender_label(index)

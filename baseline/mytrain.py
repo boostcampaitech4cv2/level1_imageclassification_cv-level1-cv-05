@@ -29,7 +29,7 @@ def My_train(data_dir, model_dir,args):
     dataset = dataset_module(
         data_dir=data_dir,)
     num_classes = dataset.num_classes  # 18
-    val_data=dataset_module(data_dir=data_dir,)
+    # val_data=dataset_module(data_dir=data_dir,)
     # -- augmentation
     transform_module = getattr(import_module("dataset"), args.augmentation)  # default: BaseAugmentation
     transform = transform_module(
@@ -37,11 +37,10 @@ def My_train(data_dir, model_dir,args):
         mean=dataset.mean,
         std=dataset.std,)
     dataset.set_transform(transform)
-    val_data.set_transform(transform)
+    # val_data.set_transform(transform)
 
     # -- data_loader
-    train_set, val_set = val_data.split_dataset()
-    train_set, non_val_set = dataset.split_dataset(57)
+    train_set, val_set = dataset.split_dataset()
     
     train_loader = DataLoader(
         train_set,
@@ -49,7 +48,7 @@ def My_train(data_dir, model_dir,args):
         num_workers=multiprocessing.cpu_count() // 2,
         shuffle=True,
         pin_memory=use_cuda,
-        drop_last=True,)
+        drop_last=False)
 
     val_loader = DataLoader(
         val_set,
@@ -57,10 +56,10 @@ def My_train(data_dir, model_dir,args):
         num_workers=multiprocessing.cpu_count() // 2,
         shuffle=False,
         pin_memory=use_cuda,
-        drop_last=True,)
+        drop_last=False)
 
     # -- model
-    model_module = getattr(import_module("model"), "MyModel")  # default: BaseModel
+    model_module = getattr(import_module("model"), args.model)  # default: BaseModel
     model = model_module().to(device)
 
     model = torch.nn.DataParallel(model)
@@ -74,16 +73,17 @@ def My_train(data_dir, model_dir,args):
     mask_optimizer = opt_module([
         {"params" : model.module.res.parameters(),'lr' : 1e-4},
         {"params" : model.module.mask_model.parameters()}],
-        lr=args.lr,weight_decay=0)
+        lr=args.lr,weight_decay=20)
 
     gen_optimizer = opt_module([
         {"params" : model.module.res.parameters(),'lr' : 1e-4},
         {"params" : model.module.gen_model.parameters()}],
-        lr=args.lr,weight_decay=0)
+        lr=args.lr,weight_decay=20)
     age_optimizer = opt_module([
         {"params" : model.module.res.parameters(),'lr' : 1e-4},
         {"params" : model.module.age_model.parameters()}],
-        lr=args.lr,weight_decay=0)    
+        lr=args.lr,weight_decay=20)    
+    
     
     """ backbone을 freeze 하지 않을 시 
     mask_optimizer = opt_module([
@@ -126,12 +126,9 @@ def My_train(data_dir, model_dir,args):
         predlist, labellist = torch.tensor([], dtype = torch.int32), torch.tensor([], dtype = torch.int32)
         mask_predlist, gen_predlist, age_predlist = torch.tensor([], dtype = torch.int32), torch.tensor([], dtype = torch.int32), torch.tensor([], dtype = torch.int32)
         mask_labellist, gen_labellist, age_labellist = torch.tensor([], dtype = torch.int32), torch.tensor([], dtype = torch.int32), torch.tensor([], dtype = torch.int32)
-        test1,test2=0,0
         for idx, train_batch in enumerate(train_loader):
             mask_optimizer.zero_grad(), gen_optimizer.zero_grad(), age_optimizer.zero_grad()
             inputs, mask_labels,gen_labels,age_labels = train_batch
-            test1+=1
-            test2+=(mask_labels.shape[0])
             inputs, mask_labels, gen_labels, age_labels = inputs.to(device), mask_labels.to(device), gen_labels.to(device), age_labels.to(device)
             
             
@@ -221,11 +218,8 @@ def My_train(data_dir, model_dir,args):
             figure = None
             predlist = torch.tensor([], dtype = torch.int32)
             labellist = torch.tensor([], dtype = torch.int32)
-            testing1,testing2=0,0
             for val_batch in val_loader:
                 inputs, mask_labels, gen_labels, age_labels = val_batch
-                testing1+=1
-                testing2+=mask_labels.shape[0]
                 inputs = inputs.to(device)
                 mask_labels, gen_labels, age_labels = mask_labels.to(device), gen_labels.to(device), age_labels.to(device)
 
@@ -290,8 +284,11 @@ def My_train(data_dir, model_dir,args):
             logger.add_scalar("Val/f1", age_acc, epoch)
             logger.add_figure("results", figure, epoch)
             print()
-    print(testing1,testing2)
-    print(test1,test2)
+    cny=0
+    # for i in val_id_list:
+    #     if i in train_id_list:
+    #         cny+=1
+    # print(cny,len(val_id_list),len(train_id_list))
 def breaking(acc,criteria = 99.5):
     if acc>=criteria:
         return True
