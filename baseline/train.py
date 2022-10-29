@@ -116,25 +116,35 @@ def train(data_dir, model_dir, args):
         print("Data Class Distribution :", dataset.classes_hist)
         classweights = 1 / torch.Tensor(dataset.classes_hist)
         classweights = classweights.double()
+        sample_weights = [0] * len(train_set)
+        for idx, test_label in enumerate(dataset.train_idxs_in_dataset):
+            class_weight = classweights[test_label]
+            sample_weights[idx] = class_weight
+
+
         MySampler = torch.utils.data.WeightedRandomSampler(
-            weights = classweights,
+            weights = sample_weights,
             num_samples=train_set.__len__(),
             replacement = True # cannot sample n_sample > prob_dist.size(-1) samples without replacement
         )
-        DataLoadershuffle = False # Sampler option is mutually exclusive with shuffle.
+        # DataLoadershuffle = False # Sampler option is mutually exclusive with shuffle.
+        train_loader = DataLoader(
+            train_set,
+            batch_size=args.batch_size,
+            num_workers=multiprocessing.cpu_count() // 2,
+            pin_memory=use_cuda,
+            drop_last=True,
+            sampler = MySampler,
+        )
     else:
-        MySampler = None
-        DataLoadershuffle = True
-
-    train_loader = DataLoader(
-        train_set,
-        batch_size=args.batch_size,
-        num_workers=multiprocessing.cpu_count() // 2,
-        shuffle=DataLoadershuffle,
-        pin_memory=use_cuda,
-        drop_last=True,
-        sampler = MySampler,
-    )
+        train_loader = DataLoader(
+            train_set,
+            batch_size=args.batch_size,
+            num_workers=multiprocessing.cpu_count() // 2,
+            shuffle=True,
+            pin_memory=use_cuda,
+            drop_last=True,
+        )
 
     val_loader = DataLoader(
         val_set,
