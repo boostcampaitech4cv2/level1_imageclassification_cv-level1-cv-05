@@ -245,8 +245,8 @@ class MaskBaseDataset(Dataset):
 
         indices_rand = torch.randperm(len(self))
 
-        train_set_indices = indices_rand[:n_val]
-        val_set_indices = indices_rand[n_val:]
+        val_set_indices = indices_rand[:n_val]
+        train_set_indices = indices_rand[n_val:]
 
         train_set = Subset(self, train_set_indices)
         val_set = Subset(self, val_set_indices)
