@@ -150,11 +150,11 @@ class MaskBaseDataset(Dataset):
                 mask_label = self._file_names[_file_name]
                 id, gender, race, age = profile.split("_")
                 gender_label = GenderLabels.from_str(gender)
-                # age_label = AgeLabels.from_number(age)
+                age_label = AgeLabels.from_number(age)
                 self.image_paths.append(img_path)
                 self.mask_labels.append(mask_label)
                 self.gender_labels.append(gender_label)
-                self.age_labels.append(int(age))
+                self.age_labels.append(age_label)
 
     def calc_statistics(self):
         has_statistics = self.mean is not None and self.std is not None
@@ -305,16 +305,7 @@ class Mydataset(MaskBaseDataset):
         return image_transform, mask_label,gender_label,age_label
     def __len__(self):
         return len(self.image_paths)
-    def age_label(self, age=60):
-        x = []
-        for i in self.age_labels:
-            if i > age - 1:
-                x.append(2)
-            elif i >=30:
-                x.append(1)
-            else :
-                x.append(0)
-        self.age_labels = x[:]
+
     def split_dataset(self,old=60) -> Tuple[Subset, Subset]:
             """
             데이터셋을 train 과 val 로 나눕니다,
@@ -322,7 +313,6 @@ class Mydataset(MaskBaseDataset):
             torch.utils.data.Subset 클래스 둘로 나눕니다.
             구현이 어렵지 않으니 구글링 혹은 IDE (e.g. pycharm) 의 navigation 기능을 통해 코드를 한 번 읽어보는 것을 추천드립니다^^
             """
-            self.age_label(old)
             n_val = int(len(self) * self.val_ratio)
             n_train = len(self) - n_val
             train_set, val_set = random_split(self, [n_train, n_val])

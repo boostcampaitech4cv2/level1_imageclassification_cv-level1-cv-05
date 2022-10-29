@@ -6,7 +6,6 @@ import torch
 class BaseModel(nn.Module):
     def __init__(self, num_classes):
         super().__init__()
-
         self.conv1 = nn.Conv2d(3, 32, kernel_size=7, stride=1)
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=1)
         self.conv3 = nn.Conv2d(64, 128, kernel_size=3, stride=1)
@@ -14,7 +13,6 @@ class BaseModel(nn.Module):
         self.dropout2 = nn.Dropout(0.25)
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(128, num_classes)
-
     def forward(self, x):
         x = self.conv1(x)
         x = F.relu(x)
@@ -36,16 +34,17 @@ class BaseModel(nn.Module):
 
 # Custom Model Template
 class MyModel(nn.Module):
-    def __init__(self):
+    def __init__(self,batch_size = 1):
         super().__init__()
-        self.res = models.resnet1(pretrained=True)
-        
-        # self.freeze()
+        self.res = models.resnet101(pretrained=True)
+        self.batch_size = batch_size
         self.mask_model = nn.Sequential(nn.Linear(1000,64),nn.BatchNorm1d(64),nn.Softplus(beta = 2),
                                         nn.Dropout(0.5),nn.Linear(64,3))
         self.gen_model = nn.Sequential(nn.Linear(1000,64),nn.BatchNorm1d(64),nn.Softplus(beta = 2),
                                         nn.Dropout(0.5),nn.Linear(64,1))
-        self.age_model = nn.Sequential(nn.Linear(1000,64),nn.BatchNorm1d(64),nn.Softplus(beta = 2),
+        self.age_mask_model= nn.Sequential(nn.Linear(1000,64),nn.BatchNorm1d(64),nn.Softplus(beta = 2),
+                                        nn.Dropout(0.5),nn.Linear(64,3))
+        self.age_no_mask_model= nn.Sequential(nn.Linear(1000,64),nn.BatchNorm1d(64),nn.Softplus(beta = 2),
                                         nn.Dropout(0.5),nn.Linear(64,3))
         self.sig = nn.Sigmoid()
         """
@@ -56,18 +55,38 @@ class MyModel(nn.Module):
     def freeze(self, a = False):
         for i in self.res.parameters():
             i.requires_grad = a
-    
-        
-
-    def forward(self, x):
+    def forward(self, x,y = None):
         """
         1. 위에서 정의한 모델 아키텍쳐를 forward propagation 을 진행해주세요
         2. 결과로 나온 output 을 return 해주세요
         """
-        x = self.res(x)
-        out1 =self.mask_model(x)
-        out2 =self.sig(self.gen_model(x)).view(-1)
-        out3 =self.age_model(x)
-        # print(out2)
-        # print(out2.type())
-        return out1, out2, out3
+        if not self.training : #eval
+            x = self.res(x)
+            out1 = self.mask_model(x)
+            out2 =self.sig(self.gen_model(x)).view(-1)
+            mask_out = torch.argmax(out1, dim=-1)
+            out3 = torch.ones_like(mask_out)
+            mask_off = self.res(x[mask_out == 2])
+            mask_on = self.res(x[mask_out != 2])
+            out3[mask_out == 2] = self.age_no_mask_model(mask_off)
+            out3[mask_out != 2] = self.age_mask_model(mask_on)
+            return out1, out2, out3
+        else:
+            x = self.res(x)
+            out1 = self.mask_model(x)
+            out2 =self.sig(self.gen_model(x)).view(-1)
+            mask_GT = y
+            out3 = torch.ones_like(mask_GT)
+            mask_off = self.res(x[mask_GT == 2])
+            mask_on = self.res(x[mask_GT != 2])
+            out3[mask_GT == 2] = self.age_no_mask_model(mask_off)
+            out3[mask_GT != 2] = self.age_mask_model(mask_on)
+            return out1, out2, out3
+# class MyModel(nn.Module):
+#     def __init__(self):
+#         super().__init__()
+#         self.backbone = models.resnet34(pretrained=True)
+#         self.mask_model = nn.Linear(1000,3)
+#         self.gen_model = nn.Linear(1000,1)
+#         self.age_mask = nn.Linear(1000,3)
+#         self.age_noramal = nn.Linear(1000,3)
