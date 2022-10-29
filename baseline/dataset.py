@@ -99,7 +99,7 @@ class AgeLabels(int, Enum):
 
         if value < 30:
             return cls.YOUNG
-        elif value < 60:
+        elif value < 55:
             return cls.MIDDLE
         else:
             return cls.OLD
@@ -297,6 +297,7 @@ class TestDataset(Dataset):
     def __init__(self, img_paths, resize, mean=(0.548, 0.504, 0.479), std=(0.237, 0.247, 0.246)):
         self.img_paths = img_paths
         self.transform = Compose([
+            CenterCrop((320, 256)),
             Resize(resize, Image.BILINEAR),
             ToTensor(),
             Normalize(mean=mean, std=std),
