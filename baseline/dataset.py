@@ -242,8 +242,18 @@ class MaskBaseDataset(Dataset):
         구현이 어렵지 않으니 구글링 혹은 IDE (e.g. pycharm) 의 navigation 기능을 통해 코드를 한 번 읽어보는 것을 추천드립니다^^
         """
         n_val = int(len(self) * self.val_ratio)
-        n_train = len(self) - n_val
-        train_set, val_set = random_split(self, [n_train, n_val])
+
+        indices_rand = torch.randperm(len(self))
+
+        train_set_indices = indices_rand[:n_val]
+        val_set_indices = indices_rand[n_val:]
+
+        train_set = Subset(self, train_set_indices)
+        val_set = Subset(self, val_set_indices)
+
+        self.train_idxs_in_dataset = train_set_indices
+        self.val_idxs_in_dataset = val_set_indices
+
         return train_set, val_set
     
 
@@ -329,6 +339,9 @@ class MaskSplitByProfileDataset(MaskBaseDataset):
                     cnt += 1
 
     def split_dataset(self) -> List[Subset]:
+        self.train_idxs_in_dataset = self.indices["train"]
+        self.val_idxs_in_dataset = self.indices["val"]
+            
         return [Subset(self, indices) for phase, indices in self.indices.items()]
 
 
