@@ -44,17 +44,21 @@ class BaseModel(nn.Module):
 class MyModel(nn.Module):
     def __init__(self):
         super().__init__()
-        # self.res = models.resnet50(pretrained=True)
+        # self.res = models.resnet152(pretrained=True)
         
         self.res = timm.create_model('vit_large_patch16_224', pretrained = True)
+        
         # model.head = nn.Linear(in_features = 1024, out_features = num_classes)
-    
+
         # self.freeze()
-        self.mask_model = nn.Sequential(nn.Dropout(0.3),nn.Linear(1024,128),nn.BatchNorm1d(128),nn.Softplus(beta = 2),
+        self.mask_model = nn.Sequential(nn.BatchNorm1d(1000),nn.Softplus(beta = 2),nn.Dropout(0.3),
+                                        nn.Linear(1000,128),nn.BatchNorm1d(128),nn.Softplus(beta = 2),
                                         nn.Dropout(0.5),nn.Linear(128,3))
-        self.gen_model = nn.Sequential(nn.Dropout(0.3),nn.Linear(1024,128),nn.BatchNorm1d(128),nn.Softplus(beta = 2),
+        self.gen_model = nn.Sequential(nn.BatchNorm1d(1000),nn.Softplus(beta = 2),nn.Dropout(0.3),
+                                       nn.Linear(1000,128),nn.BatchNorm1d(128),nn.Softplus(beta = 2),
                                         nn.Dropout(0.5),nn.Linear(128,1))
-        self.age_model = nn.Sequential(nn.Dropout(0.3),nn.Linear(1024,128),nn.BatchNorm1d(128),nn.Softplus(beta = 2),
+        self.age_model = nn.Sequential(nn.BatchNorm1d(1000),nn.Softplus(beta = 2),nn.Dropout(0.3),
+                                       nn.Linear(1000,128),nn.BatchNorm1d(128),nn.Softplus(beta = 2),
                                         nn.Dropout(0.5),nn.Linear(128,3))
         self.sig = nn.Sigmoid()
         """

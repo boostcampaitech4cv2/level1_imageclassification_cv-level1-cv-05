@@ -103,6 +103,18 @@ class AgeLabels(int, Enum):
             return cls.MIDDLE
         else:
             return cls.YOUNG
+    def from_number2(cls, value: str) -> int:
+        try:
+            value = int(value)
+        except Exception:
+            raise ValueError(f"Age value should be numeric, {value}")
+
+        if value > 59:
+            return cls.OLD
+        elif value > 29:
+            return cls.MIDDLE
+        else:
+            return cls.YOUNG
 
 
 class MaskBaseDataset(Dataset):
@@ -130,6 +142,7 @@ class MaskBaseDataset(Dataset):
         self.mask_labels = []
         self.gender_labels = []
         self.age_labels = []
+        self.real_age_labels = []
 
         self.setup()
         self.calc_statistics()
@@ -151,6 +164,8 @@ class MaskBaseDataset(Dataset):
                 id, gender, race, age = profile.split("_")
                 gender_label = GenderLabels.from_str(gender)
                 age_label = AgeLabels.from_number(age)
+                real_age_label = AgeLabels.from_number2(age)
+                self.real_age_labels.append(real_age_label)
                 self.image_paths.append(img_path)
                 self.mask_labels.append(mask_label)
                 self.gender_labels.append(gender_label)
@@ -179,10 +194,10 @@ class MaskBaseDataset(Dataset):
         mask_label = self.get_mask_label(index)
         gender_label = self.get_gender_label(index)
         age_label = self.get_age_label(index)
-        multi_class_label = self.encode_multi_class(mask_label, gender_label, age_label)
+        
 
         image_transform = self.transform(image)
-        return image_transform, multi_class_label
+        return image_transform, mask_label, gender_label, age_label
 
     def __len__(self):
         return len(self.image_paths)

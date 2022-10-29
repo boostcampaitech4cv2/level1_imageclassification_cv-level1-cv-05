@@ -25,7 +25,7 @@ def My_train(data_dir, model_dir,args):
     device = torch.device("cuda" if use_cuda else "cpu")
 
     # -- dataset
-    dataset_module = getattr(import_module("dataset"), "Mydataset")  # default: MaskBaseDataset
+    dataset_module = getattr(import_module("dataset"), args.dataset)  # default: MaskBaseDataset
     dataset = dataset_module(
         data_dir=data_dir,)
     num_classes = dataset.num_classes  # 18
@@ -39,6 +39,7 @@ def My_train(data_dir, model_dir,args):
     dataset.set_transform(transform)
     # val_data.set_transform(transform)
 
+    
     # -- data_loader
     train_set, val_set = dataset.split_dataset()
     
@@ -63,7 +64,7 @@ def My_train(data_dir, model_dir,args):
     model = model_module().to(device)
 
     model = torch.nn.DataParallel(model)
-    model.module.freeze(True)
+    model.module.freeze()
     # -- loss & metric
     mask_criterion = create_criterion(args.criterion)
     gen_criterion = create_criterion("BCE")# default: cross_entropy
@@ -73,16 +74,16 @@ def My_train(data_dir, model_dir,args):
     mask_optimizer = opt_module([
         {"params" : model.module.res.parameters(),'lr' : 1e-4},
         {"params" : model.module.mask_model.parameters()}],
-        lr=args.lr,weight_decay=20)
+        lr=args.lr,weight_decay=0)
 
     gen_optimizer = opt_module([
         {"params" : model.module.res.parameters(),'lr' : 1e-4},
         {"params" : model.module.gen_model.parameters()}],
-        lr=args.lr,weight_decay=20)
+        lr=args.lr,weight_decay=0)
     age_optimizer = opt_module([
-        {"params" : model.module.res.parameters(),'lr' : 1e-4},
+        {"params" : model.module.res.parameters(),'lr' : 1e-3},
         {"params" : model.module.age_model.parameters()}],
-        lr=args.lr,weight_decay=20)    
+        lr=args.lr*5,weight_decay=0)    
     
     
     """ backbone을 freeze 하지 않을 시 
@@ -116,9 +117,9 @@ def My_train(data_dir, model_dir,args):
     best_val_f1 = 0
     for epoch in range(args.epochs):
         # train loop
-        if epoch == 5:
-            age_criterion = create_criterion('focal')
-            mask_criterion = create_criterion('focal')
+        if epoch == args.epochs//2:
+            age_criterion = create_criterion('f1')
+            mask_criterion = create_criterion('f1')
         model.train()
         loss_value = 0
         matches = 0
@@ -130,8 +131,7 @@ def My_train(data_dir, model_dir,args):
             mask_optimizer.zero_grad(), gen_optimizer.zero_grad(), age_optimizer.zero_grad()
             inputs, mask_labels,gen_labels,age_labels = train_batch
             inputs, mask_labels, gen_labels, age_labels = inputs.to(device), mask_labels.to(device), gen_labels.to(device), age_labels.to(device)
-            
-            
+
             mask_outs, gen_outs, age_outs = model(inputs)
             mask_preds, gen_preds, age_preds = torch.argmax(mask_outs, dim=-1),gen_outs.round(),torch.argmax(age_outs, dim=-1) 
             
@@ -281,7 +281,7 @@ def My_train(data_dir, model_dir,args):
             logger.add_scalar("Val/f1", val_f1, epoch)
             logger.add_scalar("Val/mask", mask_acc, epoch)
             logger.add_scalar("Val/gen", gen_acc, epoch)
-            logger.add_scalar("Val/f1", age_acc, epoch)
+            logger.add_scalar("Val/age", age_acc, epoch)
             logger.add_figure("results", figure, epoch)
             print()
     cny=0
