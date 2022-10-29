@@ -330,10 +330,15 @@ class MaskSplitByProfileDataset(MaskBaseDataset):
                     gender_label = GenderLabels.from_str(gender)
                     age_label = AgeLabels.from_number(age)
 
+                    total_label = self.encode_multi_class(mask_label, gender_label, age_label)
+
                     self.image_paths.append(img_path)
                     self.mask_labels.append(mask_label)
                     self.gender_labels.append(gender_label)
                     self.age_labels.append(age_label)
+                    self.total_labels.append(total_label)
+
+                    self.classes_hist[total_label] = self.classes_hist[total_label] + 1
 
                     self.indices[phase].append(cnt)
                     cnt += 1
