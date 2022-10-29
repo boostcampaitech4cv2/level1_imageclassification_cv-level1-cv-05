@@ -118,7 +118,7 @@ def train(data_dir, model_dir, args):
         classweights = classweights.double()
         sample_weights = [0] * len(train_set)
         for idx, test_label in enumerate(dataset.train_idxs_in_dataset):
-            class_weight = classweights[test_label]
+            class_weight = classweights[dataset.total_labels[test_label]]
             sample_weights[idx] = class_weight
 
 
