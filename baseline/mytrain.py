@@ -61,19 +61,20 @@ def My_train(data_dir, model_dir,args):
     age_criterion = create_criterion(args.criterion)
     # age_no_mask_criterion = create_criterion(args.criterion)
     opt_module = getattr(import_module("torch.optim"), args.optimizer)  # default: SGD
+    #default : weight_decay = 20
     mask_optimizer = opt_module([
-        {"params" : model.module.res.parameters(),'lr' : 1e-4},
+        {"params" : model.module.res.parameters(),'lr' : 1e-5},
         {"params" : model.module.mask_model.parameters()}],
-        lr=args.lr,weight_decay=0)
+        lr=args.lr,weight_decay=0.1)
     gen_optimizer = opt_module([
-        {"params" : model.module.res.parameters(),'lr' : 1e-4},
+        {"params" : model.module.res.parameters(),'lr' : 1e-5},
         {"params" : model.module.gen_model.parameters()}],
-        lr=args.lr,weight_decay=0)
+        lr=args.lr,weight_decay=0.1)
     age_optimizer = opt_module([
-        {"params" : model.module.res.parameters(),'lr' : 1e-4},
+        {"params" : model.module.res.parameters(),'lr' : 1e-5},
         {"params" : model.module.age_no_mask_model.parameters()},
         {"params" : model.module.age_mask_model.parameters()}],
-        lr=args.lr,weight_decay=0)
+        lr=args.lr,weight_decay=0.1)
     # age_no_mask_optimizer = opt_module([
     #     {"params" : model.module.res.parameters(),'lr' : 1e-4},
     #     {"params" : model.module.age_no_mask_model.parameters()}],
@@ -126,7 +127,6 @@ def My_train(data_dir, model_dir,args):
             mask_optimizer.zero_grad(), gen_optimizer.zero_grad(), age_optimizer.zero_grad()
             inputs, mask_labels,gen_labels,age_labels = train_batch
             inputs, mask_labels, gen_labels, age_labels = inputs.to(device), mask_labels.to(device), gen_labels.to(device), age_labels.to(device)
-            
             
             mask_outs, gen_outs, age_outs = model(inputs, y = age_labels)
             mask_preds, gen_preds, age_preds = torch.argmax(mask_outs, dim=-1),gen_outs.round(),torch.argmax(age_outs, dim=-1) 
@@ -211,7 +211,6 @@ def My_train(data_dir, model_dir,args):
             figure = None
             predlist = torch.tensor([], dtype = torch.int32)
             labellist = torch.tensor([], dtype = torch.int32)
-            testing1,testing2=0,0
             for val_batch in val_loader:
                 inputs, mask_labels, gen_labels, age_labels = val_batch
                 inputs = inputs.to(device)

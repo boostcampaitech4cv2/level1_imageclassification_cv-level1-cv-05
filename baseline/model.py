@@ -34,18 +34,18 @@ class BaseModel(nn.Module):
 
 # Custom Model Template
 class MyModel(nn.Module):
-    def __init__(self,batch_size = 1):
+    def __init__(self):
         super().__init__()
-        self.res = models.resnet101(pretrained=True)
-        self.batch_size = batch_size
-        self.mask_model = nn.Sequential(nn.Linear(1000,64),nn.BatchNorm1d(64),nn.Softplus(beta = 2),
-                                        nn.Dropout(0.5),nn.Linear(64,3))
-        self.gen_model = nn.Sequential(nn.Linear(1000,64),nn.BatchNorm1d(64),nn.Softplus(beta = 2),
-                                        nn.Dropout(0.5),nn.Linear(64,1))
-        self.age_mask_model= nn.Sequential(nn.Linear(1000,64),nn.BatchNorm1d(64),nn.Softplus(beta = 2),
-                                        nn.Dropout(0.5),nn.Linear(64,3))
-        self.age_no_mask_model= nn.Sequential(nn.Linear(1000,64),nn.BatchNorm1d(64),nn.Softplus(beta = 2),
-                                        nn.Dropout(0.5),nn.Linear(64,3))
+        self.res = models.resnet50(pretrained=True)
+        
+        self.mask_model = nn.Sequential(nn.Softplus(beta = 2),nn.Dropout(0.3),nn.Linear(1000,128),nn.BatchNorm1d(128),nn.Softplus(beta = 2),
+                                        nn.Dropout(0.5),nn.Linear(128,3))
+        self.gen_model = nn.Sequential(nn.Softplus(beta = 2),nn.Dropout(0.3),nn.Linear(1000,128),nn.BatchNorm1d(128),nn.Softplus(beta = 2),
+                                        nn.Dropout(0.5),nn.Linear(128,1))
+        self.age_mask_model= nn.Sequential(nn.Softplus(beta = 2),nn.Dropout(0.3),nn.Linear(1000,128),nn.Softplus(beta = 2),
+                                        nn.Dropout(0.5),nn.Linear(128,3))
+        self.age_no_mask_model= nn.Sequential(nn.Softplus(beta = 2),nn.Dropout(0.3),nn.Linear(1000,128),nn.Softplus(beta = 2),
+                                        nn.Dropout(0.5),nn.Linear(128,3))
         self.sig = nn.Sigmoid()
         """
         1. 위와 같이 생성자의 parameter 에 num_claases 를 포함해주세요.
@@ -55,7 +55,7 @@ class MyModel(nn.Module):
     def freeze(self, a = False):
         for i in self.res.parameters():
             i.requires_grad = a
-    def forward(self, x,y = None):
+    def forward(self, x, y = None):
         """
         1. 위에서 정의한 모델 아키텍쳐를 forward propagation 을 진행해주세요
         2. 결과로 나온 output 을 return 해주세요
@@ -65,9 +65,10 @@ class MyModel(nn.Module):
             out1 = self.mask_model(x)
             out2 =self.sig(self.gen_model(x)).view(-1)
             mask_out = torch.argmax(out1, dim=-1)
-            out3 = torch.ones_like(mask_out)
-            mask_off = self.res(x[mask_out == 2])
-            mask_on = self.res(x[mask_out != 2])
+            out3 = torch.ones(mask_out.shape[0],3).to(out2.device)
+            mask_off = x[mask_out == 2]
+            mask_on = x[mask_out != 2]
+            
             out3[mask_out == 2] = self.age_no_mask_model(mask_off)
             out3[mask_out != 2] = self.age_mask_model(mask_on)
             return out1, out2, out3
@@ -75,12 +76,22 @@ class MyModel(nn.Module):
             x = self.res(x)
             out1 = self.mask_model(x)
             out2 =self.sig(self.gen_model(x)).view(-1)
-            mask_GT = y
-            out3 = torch.ones_like(mask_GT)
-            mask_off = self.res(x[mask_GT == 2])
-            mask_on = self.res(x[mask_GT != 2])
-            out3[mask_GT == 2] = self.age_no_mask_model(mask_off)
-            out3[mask_GT != 2] = self.age_mask_model(mask_on)
+            mask_out = torch.argmax(out1, dim=-1)
+            out3 = torch.ones(mask_out.shape[0],3).to(out2.device)
+            mask_off = x[mask_out == 2]
+            mask_on = x[mask_out != 2]
+            
+            out3[mask_out == 2] = self.age_no_mask_model(mask_off)
+            out3[mask_out != 2] = self.age_mask_model(mask_on)
+            # x = self.res(x)
+            # out1 = self.mask_model(x)
+            # out2 =self.sig(self.gen_model(x)).view(-1)
+            # mask_GT = x[y == 2]
+            # no_mask_GT = x[y != 2]
+            
+            # out3 = torch.ones(out1.shape[0],3).to(out2.device)
+            # out3[y==2] = self.age_no_mask_model(mask_GT)
+            # out3[y!=2] = self.age_mask_model(no_mask_GT)
             return out1, out2, out3
 # class MyModel(nn.Module):
 #     def __init__(self):
