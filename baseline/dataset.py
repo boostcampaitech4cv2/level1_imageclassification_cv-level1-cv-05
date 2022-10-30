@@ -3,6 +3,7 @@ import random
 from collections import defaultdict
 from enum import Enum
 from typing import Tuple, List
+import random
 
 import numpy as np
 import torch
@@ -118,17 +119,22 @@ class MaskBaseDataset(Dataset):
         "normal": MaskLabels.NORMAL
     }
 
-    image_paths = []
-    mask_labels = []
-    gender_labels = []
-    age_labels = []
-
     def __init__(self, data_dir, mean=(0.548, 0.504, 0.479), std=(0.237, 0.247, 0.246), val_ratio=0.2):
+
+        self.image_paths = []
+        self.mask_labels = []
+        self.gender_labels = []
+        self.age_labels = []
+        self.total_labels = []
+        self.train_idxs_in_dataset = None
+        self.val_idxs_in_dataset = None
+
         self.data_dir = data_dir
         self.mean = mean
         self.std = std
         self.val_ratio = val_ratio
 
+        self.classes_hist = np.zeros(self.num_classes)
         self.transform = None
         self.setup()
         self.calc_statistics()
@@ -152,10 +158,16 @@ class MaskBaseDataset(Dataset):
                 gender_label = GenderLabels.from_str(gender)
                 age_label = AgeLabels.from_number(age)
 
+                total_label = self.encode_multi_class(mask_label, gender_label, age_label)
+
                 self.image_paths.append(img_path)
                 self.mask_labels.append(mask_label)
                 self.gender_labels.append(gender_label)
                 self.age_labels.append(age_label)
+                self.total_labels.append(total_label)
+                
+                self.classes_hist[total_label] = self.classes_hist[total_label] + 1
+
 
     def calc_statistics(self):
         has_statistics = self.mean is not None and self.std is not None
@@ -230,8 +242,45 @@ class MaskBaseDataset(Dataset):
         구현이 어렵지 않으니 구글링 혹은 IDE (e.g. pycharm) 의 navigation 기능을 통해 코드를 한 번 읽어보는 것을 추천드립니다^^
         """
         n_val = int(len(self) * self.val_ratio)
-        n_train = len(self) - n_val
-        train_set, val_set = random_split(self, [n_train, n_val])
+
+        indices_rand = torch.randperm(len(self))
+
+        val_set_indices = indices_rand[:n_val]
+        train_set_indices = indices_rand[n_val:]
+
+        train_set = Subset(self, train_set_indices)
+        val_set = Subset(self, val_set_indices)
+
+        self.train_idxs_in_dataset = train_set_indices
+        self.val_idxs_in_dataset = val_set_indices
+
+        return train_set, val_set
+    
+
+class MaskStratifiedDataset(MaskBaseDataset):
+    """
+        train / val 나누는 기준을 class의 비율을 유지하면서 나눕니다.
+    """
+
+    def __init__(self, data_dir, mean=(0.548, 0.504, 0.479), std=(0.237, 0.247, 0.246), val_ratio=0.2):
+        super().__init__(data_dir, mean, std, val_ratio)
+    
+    def split_dataset(self) -> Tuple[Subset, Subset]:
+        indices_per_label = defaultdict(list)
+        for index, label in enumerate(self.total_labels):
+            indices_per_label[label].append(index)
+        val_set_indices, train_set_indices = list(), list()
+        for label, indices in indices_per_label.items():
+            n_samples_for_label = round(len(indices) * self.val_ratio)
+            random_indices_sample = random.sample(indices, n_samples_for_label)
+            val_set_indices.extend(random_indices_sample)
+            train_set_indices.extend(set(indices) - set(random_indices_sample))
+        train_set = Subset(self, train_set_indices)
+        val_set = Subset(self, val_set_indices)
+        # first_set_labels = list(map(self.total_labels.__getitem__, first_set_indices))
+        self.train_idxs_in_dataset = train_set_indices
+        self.val_idxs_in_dataset = val_set_indices
+        # secound_set_labels = list(map(self.total_labels.__getitem__, second_set_indices))
         return train_set, val_set
 
 
@@ -281,15 +330,23 @@ class MaskSplitByProfileDataset(MaskBaseDataset):
                     gender_label = GenderLabels.from_str(gender)
                     age_label = AgeLabels.from_number(age)
 
+                    total_label = self.encode_multi_class(mask_label, gender_label, age_label)
+
                     self.image_paths.append(img_path)
                     self.mask_labels.append(mask_label)
                     self.gender_labels.append(gender_label)
                     self.age_labels.append(age_label)
+                    self.total_labels.append(total_label)
+
+                    self.classes_hist[total_label] = self.classes_hist[total_label] + 1
 
                     self.indices[phase].append(cnt)
                     cnt += 1
 
     def split_dataset(self) -> List[Subset]:
+        self.train_idxs_in_dataset = self.indices["train"]
+        self.val_idxs_in_dataset = self.indices["val"]
+            
         return [Subset(self, indices) for phase, indices in self.indices.items()]
 
 
@@ -297,6 +354,7 @@ class TestDataset(Dataset):
     def __init__(self, img_paths, resize, mean=(0.548, 0.504, 0.479), std=(0.237, 0.247, 0.246)):
         self.img_paths = img_paths
         self.transform = Compose([
+            CenterCrop((320, 256)),
             Resize(resize, Image.BILINEAR),
             ToTensor(),
             Normalize(mean=mean, std=std),

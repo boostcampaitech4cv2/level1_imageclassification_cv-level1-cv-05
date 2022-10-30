@@ -175,3 +175,6 @@ cython_debug/
 #.idea/
 
 # End of https://www.toptal.com/developers/gitignore/api/jupyternotebooks,python
+#
+events.out.*
+*.pth 

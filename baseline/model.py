@@ -1,5 +1,7 @@
 import torch.nn as nn
 import torch.nn.functional as F
+import torchvision
+import timm
 
 
 class BaseModel(nn.Module):
@@ -50,3 +52,14 @@ class MyModel(nn.Module):
         2. 결과로 나온 output 을 return 해주세요
         """
         return x
+
+
+def ResNet152(num_classes):
+    resnet152 = torchvision.models.resnet152(pretrained = True)
+    resnet152.fc = nn.Linear(in_features = 2048, out_features = num_classes)
+    return resnet152
+
+def ViT(num_classes):
+    model = timm.create_model('vit_large_patch16_224', pretrained = True)
+    model.head = nn.Linear(in_features = 1024, out_features = num_classes)
+    return model
