@@ -35,14 +35,16 @@ class BaseModel(nn.Module):
 
 
 # Custom Model Template
-class MyModel(nn.Module):
+
+class MyMaskModel(nn.Module):
     def __init__(self):
         super().__init__()
         self.res = models.resnet50(pretrained=True)
-        self.res.fc = nn.Linear(2048, 1024)
-        self.add_fc = nn.Linear(1024, 512)
-        self.out_fc = nn.Linear(512, 1)
-        self.relu = nn.ReLU()
+        # self.res.fc = nn.Linear(2048, 1024)
+        # self.add_fc = nn.Linear(1024, 512)
+        # self.out_fc = nn.Linear(512, 1)
+        # self.relu = nn.ReLU()
+        self.res.fc = nn.Linear(2048, 3)
         """
         1. 위와 같이 생성자의 parameter 에 num_claases 를 포함해주세요.
         2. 나만의 모델 아키텍쳐를 디자인 해봅니다.
@@ -54,9 +56,42 @@ class MyModel(nn.Module):
         1. 위에서 정의한 모델 아키텍쳐를 forward propagation 을 진행해주세요
         2. 결과로 나온 output 을 return 해주세요
         """
-        out = self.relu(self.res(x))
-        out = self.relu(self.add_fc(out))
-        out = self.out_fc(out)
+        out = self.res(x)
+        # out = self.relu(self.res(x))
+        # out = self.relu(self.add_fc(out))
+        # out = self.out_fc(out)
         # print(out2)
         # print(out2.type())
         return out
+
+class MyGenderAgeModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.res = models.resnet50(pretrained=True)
+        # self.res.fc = nn.Linear(2048, 1024)
+        # self.add_fc = nn.Linear(1024, 512)
+        # self.out_fc = nn.Linear(512, 1)
+        # self.relu = nn.ReLU()
+        self.res.fc = nn.Linear(2048, 1024)
+        self.fc_gender = nn.Linear(1024, 1)
+        self.fc_age = nn.Linear(1024, 1)
+        """
+        1. 위와 같이 생성자의 parameter 에 num_claases 를 포함해주세요.
+        2. 나만의 모델 아키텍쳐를 디자인 해봅니다.
+        3. 모델의 output_dimension 은 num_classes 로 설정해주세요.
+        """
+
+    def forward(self, x):
+        """
+        1. 위에서 정의한 모델 아키텍쳐를 forward propagation 을 진행해주세요
+        2. 결과로 나온 output 을 return 해주세요
+        """
+        out = self.res(x)
+        out_gender = self.fc_gender(out)
+        out_age = self.fc_age(out)
+        # out = self.relu(self.res(x))
+        # out = self.relu(self.add_fc(out))
+        # out = self.out_fc(out)
+        # print(out2)
+        # print(out2.type())
+        return out_gender, out_age
