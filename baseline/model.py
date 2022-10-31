@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import models
-import torch
+import timm
 
 class BaseModel(nn.Module):
     def __init__(self, num_classes):
@@ -38,15 +38,16 @@ class BaseModel(nn.Module):
 class MyModel(nn.Module):
     def __init__(self):
         super().__init__()
-        self.res = models.resnet1(pretrained=True)
+        self.res = timm.create_model('vit_base_patch16_224', pretrained = True)
+        self.res.head=nn.Linear(384*2,256)
         
         # self.freeze()
-        self.mask_model = nn.Sequential(nn.Linear(1000,64),nn.BatchNorm1d(64),nn.Softplus(beta = 2),
-                                        nn.Dropout(0.5),nn.Linear(64,3))
-        self.gen_model = nn.Sequential(nn.Linear(1000,64),nn.BatchNorm1d(64),nn.Softplus(beta = 2),
-                                        nn.Dropout(0.5),nn.Linear(64,1))
-        self.age_model = nn.Sequential(nn.Linear(1000,64),nn.BatchNorm1d(64),nn.Softplus(beta = 2),
-                                        nn.Dropout(0.5),nn.Linear(64,3))
+        self.mask_model = nn.Sequential(nn.BatchNorm1d(256),nn.Softplus(beta = 2),
+                                        nn.Dropout(0.5),nn.Linear(256,3))
+        self.gen_model = nn.Sequential(nn.BatchNorm1d(256),nn.Softplus(beta = 2),
+                                        nn.Dropout(0.5),nn.Linear(256,1))
+        self.age_model = nn.Sequential(nn.BatchNorm1d(256),nn.Softplus(beta = 2),
+                                        nn.Dropout(0.5),nn.Linear(256,3))
         self.sig = nn.Sigmoid()
         """
         1. 위와 같이 생성자의 parameter 에 num_claases 를 포함해주세요.

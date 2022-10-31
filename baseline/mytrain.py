@@ -15,6 +15,34 @@ from torch.utils.tensorboard import SummaryWriter
 from loss import create_criterion
 
 from utils import seed_everything, increment_path,get_lr,grid_image
+def get_opt(model,opt_module,args, freeze = True):
+    if freeze:
+        m = opt_module([
+            {"params" : model.module.res.head.parameters(),'lr' : 1e-6},
+            {"params" : model.module.mask_model.parameters()}],
+            lr=args.lr,weight_decay=1e-3)
+        g = opt_module([
+            {"params" : model.module.res.head.parameters(),'lr' : 1e-6},
+            {"params" : model.module.gen_model.parameters()}],
+            lr=args.lr,weight_decay=5e-4)
+        a = opt_module([
+            {"params" : model.module.res.head.parameters(),'lr' : 1e-6},
+            {"params" : model.module.age_model.parameters()}],
+            lr=args.lr,weight_decay=5e-4)  
+    else :
+        m = opt_module([
+            {"params" : model.module.res.parameters(),'lr' : 1e-6},
+            {"params" : model.module.mask_model.parameters()}],
+            lr=args.lr,weight_decay=1e-3)
+        g = opt_module([
+            {"params" : model.module.res.parameters(),'lr' : 1e-6},
+            {"params" : model.module.gen_model.parameters()}],
+            lr=args.lr,weight_decay=5e-4)
+        a = opt_module([
+            {"params" : model.module.res.parameters(),'lr' : 1e-6},
+            {"params" : model.module.age_model.parameters()}],
+            lr=args.lr,weight_decay=5e-4)  
+    return m,g,a
 def My_train(data_dir, model_dir,args):
     seed_everything(args.seed)
 
@@ -25,7 +53,7 @@ def My_train(data_dir, model_dir,args):
     device = torch.device("cuda" if use_cuda else "cpu")
 
     # -- dataset
-    dataset_module = getattr(import_module("dataset"), "Mydataset")  # default: MaskBaseDataset
+    dataset_module = getattr(import_module("dataset"), args.dataset)  # default: MaskBaseDataset
     dataset = dataset_module(
         data_dir=data_dir,)
     num_classes = dataset.num_classes  # 18
@@ -41,7 +69,6 @@ def My_train(data_dir, model_dir,args):
 
     # -- data_loader
     train_set, val_set = val_data.split_dataset()
-    train_set, non_val_set = dataset.split_dataset(57)
     
     train_loader = DataLoader(
         train_set,
@@ -60,31 +87,18 @@ def My_train(data_dir, model_dir,args):
         drop_last=True,)
 
     # -- model
-    model_module = getattr(import_module("model"), "MyModel")  # default: BaseModel
+    model_module = getattr(import_module("model"), args.model)  # default: BaseModel
     model = model_module().to(device)
 
     model = torch.nn.DataParallel(model)
-    model.module.freeze(True)
     # -- loss & metric
     mask_criterion = create_criterion(args.criterion)
     gen_criterion = create_criterion("BCE")# default: cross_entropy
     age_criterion = create_criterion(args.criterion)
     
     opt_module = getattr(import_module("torch.optim"), args.optimizer)  # default: SGD
-    mask_optimizer = opt_module([
-        {"params" : model.module.res.parameters(),'lr' : 1e-4},
-        {"params" : model.module.mask_model.parameters()}],
-        lr=args.lr,weight_decay=0)
-
-    gen_optimizer = opt_module([
-        {"params" : model.module.res.parameters(),'lr' : 1e-4},
-        {"params" : model.module.gen_model.parameters()}],
-        lr=args.lr,weight_decay=0)
-    age_optimizer = opt_module([
-        {"params" : model.module.res.parameters(),'lr' : 1e-4},
-        {"params" : model.module.age_model.parameters()}],
-        lr=args.lr,weight_decay=0)    
-    
+    mask_optimizer,gen_optimizer,age_optimizer = get_opt(model,opt_module,args, freeze = False)
+    # m_o,g_o,a_o = get_opt(model,opt_module,args, freeze = False)
     """ backbone을 freeze 하지 않을 시 
     mask_optimizer = opt_module([
         {"params" : model.module.res.parameters(),'lr' : 1e-5},
@@ -102,7 +116,7 @@ def My_train(data_dir, model_dir,args):
         filter(lambda p: p.requires_grad, model.module.age_model.parameters()),
         lr=args.lr,weight_decay=5e-4)"""
     mask_scheduler, gen_scheduler, age_scheduler = StepLR(mask_optimizer, args.lr_decay_step, gamma=0.5), StepLR(gen_optimizer, args.lr_decay_step, gamma=0.5), StepLR(age_optimizer, args.lr_decay_step, gamma=0.5)
-    
+    # m_s,g_s,a_s = StepLR(m_o, args.lr_decay_step, gamma=0.5), StepLR(g_o, args.lr_decay_step, gamma=0.5), StepLR(a_o, args.lr_decay_step, gamma=0.5)
     # -- logging
     logger = SummaryWriter(log_dir=save_dir)
     with open(os.path.join(save_dir, 'config.json'), 'w', encoding='utf-8') as f:
@@ -114,11 +128,15 @@ def My_train(data_dir, model_dir,args):
     best_val_acc = 0
     best_val_loss = np.inf
     best_val_f1 = 0
+    frz = range(0,100,4)
+    losslist=['focal','f1','label_smoothing']
+    lossid=1
     for epoch in range(args.epochs):
         # train loop
-        if epoch == 5:
-            age_criterion = create_criterion('focal')
-            mask_criterion = create_criterion('focal')
+        if epoch%6==0:
+            age_criterion = create_criterion(losslist[lossid%3])
+            mask_criterion = create_criterion(losslist[lossid%3])
+            lossid+=1
         model.train()
         loss_value = 0
         matches = 0
@@ -126,14 +144,11 @@ def My_train(data_dir, model_dir,args):
         predlist, labellist = torch.tensor([], dtype = torch.int32), torch.tensor([], dtype = torch.int32)
         mask_predlist, gen_predlist, age_predlist = torch.tensor([], dtype = torch.int32), torch.tensor([], dtype = torch.int32), torch.tensor([], dtype = torch.int32)
         mask_labellist, gen_labellist, age_labellist = torch.tensor([], dtype = torch.int32), torch.tensor([], dtype = torch.int32), torch.tensor([], dtype = torch.int32)
-        test1,test2=0,0
+        
         for idx, train_batch in enumerate(train_loader):
             mask_optimizer.zero_grad(), gen_optimizer.zero_grad(), age_optimizer.zero_grad()
             inputs, mask_labels,gen_labels,age_labels = train_batch
-            test1+=1
-            test2+=(mask_labels.shape[0])
             inputs, mask_labels, gen_labels, age_labels = inputs.to(device), mask_labels.to(device), gen_labels.to(device), age_labels.to(device)
-            
             
             mask_outs, gen_outs, age_outs = model(inputs)
             mask_preds, gen_preds, age_preds = torch.argmax(mask_outs, dim=-1),gen_outs.round(),torch.argmax(age_outs, dim=-1) 
@@ -158,7 +173,17 @@ def My_train(data_dir, model_dir,args):
             predlist = torch.cat((predlist, preds.cpu()))
             labellist = torch.cat((labellist, labels.cpu()))
             
-            # when backbone is not frozen 
+            # when backbone is not frozen
+            # if idx ==0 or idx==1:
+            #     m_o.zero_grad(),g_o.zero_grad(),a_o.zero_grad()
+            #     with torch.autograd.set_detect_anomaly(True):
+            #         mask_loss.backward(retain_graph=True)
+            #         gen_loss.backward(retain_graph=True)
+            #         age_loss.backward()
+            #         m_o.step()
+            #         g_o.step()
+            #         a_o.step()
+            # else :
             with torch.autograd.set_detect_anomaly(True):
                 mask_loss.backward(retain_graph=True)
                 gen_loss.backward(retain_graph=True)
@@ -209,8 +234,8 @@ def My_train(data_dir, model_dir,args):
         if stop:
             print("stop training \ntrain acc > 99.5%")
             break
-        mask_scheduler.step(), gen_scheduler.step(), age_scheduler.step()
-
+        mask_scheduler.step(), gen_scheduler.step(), age_scheduler.step() 
+        # m_s.step(),g_s.step(),a_s.step()
         # val loop
         with torch.no_grad():
             print("Calculating validation results...")
@@ -221,11 +246,8 @@ def My_train(data_dir, model_dir,args):
             figure = None
             predlist = torch.tensor([], dtype = torch.int32)
             labellist = torch.tensor([], dtype = torch.int32)
-            testing1,testing2=0,0
             for val_batch in val_loader:
                 inputs, mask_labels, gen_labels, age_labels = val_batch
-                testing1+=1
-                testing2+=mask_labels.shape[0]
                 inputs = inputs.to(device)
                 mask_labels, gen_labels, age_labels = mask_labels.to(device), gen_labels.to(device), age_labels.to(device)
 
@@ -290,8 +312,6 @@ def My_train(data_dir, model_dir,args):
             logger.add_scalar("Val/f1", age_acc, epoch)
             logger.add_figure("results", figure, epoch)
             print()
-    print(testing1,testing2)
-    print(test1,test2)
 def breaking(acc,criteria = 99.5):
     if acc>=criteria:
         return True
