@@ -1,7 +1,7 @@
 {
     "seed": 42,
-    "epochs": 100,
-    "dataset": "MaskSplitByProfileDataset",
+    "epochs": 40,
+    "dataset": "MaskStratifiedDataset",
     "augmentation": "CustomAugmentation",
     "resize": [
         224,
@@ -10,13 +10,14 @@
     "batch_size": 32,
     "valid_batch_size": 1000,
     "model": "MyModel",
-    "optimizer": "SGD",
-    "lr": 0.02,
+    "optimizer": "AdamW",
+    "lr": 0.0008,
     "val_ratio": 0.2,
-    "criterion": "focal",
-    "lr_decay_step": 20,
+    "criterion": "f1",
+    "lr_decay_step": 10,
     "log_interval": 20,
-    "name": "vit_three_task",
+    "name": "vitbase_sampler_4age_59",
+    "weightedsampler": "yes",
     "data_dir": "/opt/ml/input/data/train/images",
     "model_dir": "./model"
 }

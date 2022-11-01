@@ -57,12 +57,13 @@ def inference(data_dir, model_dir, output_dir, args):
             images = images.to(device)
             mask_pred,gen_pred,age_pred = model(images)
             mask_outs,gen_outs,age_outs, = mask_pred.argmax(dim=-1),gen_pred.round(),age_pred.argmax(dim=-1)
+            age_outs[age_outs==3]=1
+            # age_outs[age_outs==4]=1
             pred=(mask_outs*6 + gen_outs*3 + age_outs).to(torch.int32)
             preds.extend(pred.cpu().numpy())
 
     info['ans'] = preds
-    save_path = increment_path(os.path.join(output_dir, f'output.csv'))
-    
+    save_path = os.path.join(output_dir, f'vit_sampler_4age_59.csv')
     info.to_csv(save_path, index=False)
     print(f"Inference Done! Inference result saved at {save_path}")
 
@@ -72,12 +73,12 @@ if __name__ == '__main__':
 
     # Data and model checkpoints directories
     parser.add_argument('--batch_size', type=int, default=1000, help='input batch size for validing (default: 1000)')
-    parser.add_argument('--resize', type=tuple, default=(128,96), help='resize size for image when you trained (default: (96, 128))')
+    parser.add_argument('--resize', type=tuple, default=(224,224), help='resize size for image when you trained (default: (96, 128))')
     parser.add_argument('--model', type=str, default='MyModel', help='model type (default: BaseModel)')
 
     # Container environment
     parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_EVAL', '/opt/ml/input/data/eval'))
-    parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_CHANNEL_MODEL', './model/exp13'))
+    parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_CHANNEL_MODEL', './model/freeze_3task_4age59_'))
     parser.add_argument('--output_dir', type=str, default=os.environ.get('SM_OUTPUT_DATA_DIR', './output'))
 
     args = parser.parse_args()
