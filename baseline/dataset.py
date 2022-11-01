@@ -141,6 +141,11 @@ class MaskBaseDataset(Dataset):
 
         self.classes_hist = np.zeros(self.num_classes)
         self.transform = None
+        if (os.path.isdir(os.path.join(self.rembg_dir))):
+            self.userembg = True
+        else:
+            self.userembg = False
+        
         self.setup()
         self.calc_statistics()
 
@@ -154,12 +159,17 @@ class MaskBaseDataset(Dataset):
             if profile.startswith("."):  # "." 로 시작하는 파일은 무시합니다
                 continue
         
-            img_folders = [os.path.join(self.data_dir, profile), os.path.join(self.rembg_dir, profile)]
+            if self.userembg:
+                img_folders = [os.path.join(self.data_dir, profile), os.path.join(self.rembg_dir, profile)]
+            else:
+                img_folders = [os.path.join(self.data_dir, profile)]
+                
             for idx_folder, img_folder in enumerate(img_folders):
                 if idx_folder == 0:
                     folder_dir = self.data_dir
                 else:
                     folder_dir = self.rembg_dir
+                
                 for file_name in os.listdir(img_folder):
                     _file_name, ext = os.path.splitext(file_name)
                     if _file_name not in self._file_names:  # "." 로 시작하는 파일 및 invalid 한 파일들은 무시합니다
