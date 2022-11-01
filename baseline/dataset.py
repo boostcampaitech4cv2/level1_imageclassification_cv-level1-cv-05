@@ -53,12 +53,12 @@ class AddGaussianNoise(object):
 class CustomAugmentation:
     def __init__(self, resize, mean, std, **args):
         self.transform = Compose([
-            CenterCrop((320, 256)),
+            # CenterCrop((320, 256)),
             Resize(resize, Image.BILINEAR),
             ColorJitter(0.1, 0.1, 0.1, 0.1),
             ToTensor(),
             Normalize(mean=mean, std=std),
-            AddGaussianNoise()
+            # AddGaussianNoise()
         ])
 
     def __call__(self, image):
@@ -119,8 +119,7 @@ class MaskBaseDataset(Dataset):
         "normal": MaskLabels.NORMAL
     }
 
-    def __init__(self, data_dir, mean=(0.548, 0.504, 0.479), std=(0.237, 0.247, 0.246), val_ratio=0.2):
-
+    def __init__(self, data_dir, rembg_dir, mean=(0.548, 0.504, 0.479), std=(0.237, 0.247, 0.246), val_ratio=0.2):
         self.image_paths = []
         self.mask_labels = []
         self.gender_labels = []
@@ -130,6 +129,7 @@ class MaskBaseDataset(Dataset):
         self.val_idxs_in_dataset = None
 
         self.data_dir = data_dir
+        self.rembg_dir = rembg_dir
         self.mean = mean
         self.std = std
         self.val_ratio = val_ratio
@@ -144,29 +144,35 @@ class MaskBaseDataset(Dataset):
         for profile in profiles:
             if profile.startswith("."):  # "." 로 시작하는 파일은 무시합니다
                 continue
+        
+            img_folders = [os.path.join(self.data_dir, profile), os.path.join(self.rembg_dir, profile)]
+            for idx_folder, img_folder in enumerate(img_folders):
+                if idx_folder == 0:
+                    folder_dir = self.data_dir
+                else:
+                    folder_dir = self.rembg_dir
+                for file_name in os.listdir(img_folder):
+                    _file_name, ext = os.path.splitext(file_name)
+                    if _file_name not in self._file_names:  # "." 로 시작하는 파일 및 invalid 한 파일들은 무시합니다
+                        continue
 
-            img_folder = os.path.join(self.data_dir, profile)
-            for file_name in os.listdir(img_folder):
-                _file_name, ext = os.path.splitext(file_name)
-                if _file_name not in self._file_names:  # "." 로 시작하는 파일 및 invalid 한 파일들은 무시합니다
-                    continue
+                    img_path = os.path.join(folder_dir, profile, file_name)  # (resized_data, 000004_male_Asian_54, mask1.jpg)
+                    
+                    mask_label = self._file_names[_file_name]
 
-                img_path = os.path.join(self.data_dir, profile, file_name)  # (resized_data, 000004_male_Asian_54, mask1.jpg)
-                mask_label = self._file_names[_file_name]
+                    id, gender, race, age = profile.split("_")
+                    gender_label = GenderLabels.from_str(gender)
+                    age_label = AgeLabels.from_number(age)
 
-                id, gender, race, age = profile.split("_")
-                gender_label = GenderLabels.from_str(gender)
-                age_label = AgeLabels.from_number(age)
+                    total_label = self.encode_multi_class(mask_label, gender_label, age_label)
 
-                total_label = self.encode_multi_class(mask_label, gender_label, age_label)
-
-                self.image_paths.append(img_path)
-                self.mask_labels.append(mask_label)
-                self.gender_labels.append(gender_label)
-                self.age_labels.append(age_label)
-                self.total_labels.append(total_label)
-                
-                self.classes_hist[total_label] = self.classes_hist[total_label] + 1
+                    self.image_paths.append(img_path)
+                    self.mask_labels.append(mask_label)
+                    self.gender_labels.append(gender_label)
+                    self.age_labels.append(age_label)
+                    self.total_labels.append(total_label)
+                    
+                    self.classes_hist[total_label] = self.classes_hist[total_label] + 1
 
 
     def calc_statistics(self):
@@ -212,7 +218,7 @@ class MaskBaseDataset(Dataset):
 
     def read_image(self, index):
         image_path = self.image_paths[index]
-        return Image.open(image_path)
+        return Image.open(image_path).convert('RGB')
 
     @staticmethod
     def encode_multi_class(mask_label, gender_label, age_label) -> int:
@@ -262,8 +268,8 @@ class MaskStratifiedDataset(MaskBaseDataset):
         train / val 나누는 기준을 class의 비율을 유지하면서 나눕니다.
     """
 
-    def __init__(self, data_dir, mean=(0.548, 0.504, 0.479), std=(0.237, 0.247, 0.246), val_ratio=0.2):
-        super().__init__(data_dir, mean, std, val_ratio)
+    def __init__(self, data_dir, rembg_dir, mean=(0.548, 0.504, 0.479), std=(0.237, 0.247, 0.246), val_ratio=0.2):
+        super().__init__(data_dir, rembg_dir, mean, std, val_ratio)
     
     def split_dataset(self) -> Tuple[Subset, Subset]:
         indices_per_label = defaultdict(list)
@@ -292,9 +298,9 @@ class MaskSplitByProfileDataset(MaskBaseDataset):
         이후 `split_dataset` 에서 index 에 맞게 Subset 으로 dataset 을 분기합니다.
     """
 
-    def __init__(self, data_dir, mean=(0.548, 0.504, 0.479), std=(0.237, 0.247, 0.246), val_ratio=0.2):
+    def __init__(self, data_dir, rembg_dir, mean=(0.548, 0.504, 0.479), std=(0.237, 0.247, 0.246), val_ratio=0.2):
         self.indices = defaultdict(list)
-        super().__init__(data_dir, mean, std, val_ratio)
+        super().__init__(data_dir, rembg_dir, mean, std, val_ratio)
 
     @staticmethod
     def _split_profile(profiles, val_ratio):
@@ -317,31 +323,37 @@ class MaskSplitByProfileDataset(MaskBaseDataset):
         for phase, indices in split_profiles.items():
             for _idx in indices:
                 profile = profiles[_idx]
-                img_folder = os.path.join(self.data_dir, profile)
-                for file_name in os.listdir(img_folder):
-                    _file_name, ext = os.path.splitext(file_name)
-                    if _file_name not in self._file_names:  # "." 로 시작하는 파일 및 invalid 한 파일들은 무시합니다
-                        continue
+                img_folders = [os.path.join(self.data_dir, profile), os.path.join(self.rembg_dir, profile)]
 
-                    img_path = os.path.join(self.data_dir, profile, file_name)  # (resized_data, 000004_male_Asian_54, mask1.jpg)
-                    mask_label = self._file_names[_file_name]
+                for idx_folder, img_folder in enumerate(img_folders):
+                    if idx_folder == 0:
+                        folder_dir = self.data_dir
+                    else:
+                        folder_dir = self.rembg_dir
+                    for file_name in os.listdir(img_folder):
+                        _file_name, ext = os.path.splitext(file_name)
+                        if _file_name not in self._file_names:  # "." 로 시작하는 파일 및 invalid 한 파일들은 무시합니다
+                            continue
 
-                    id, gender, race, age = profile.split("_")
-                    gender_label = GenderLabels.from_str(gender)
-                    age_label = AgeLabels.from_number(age)
+                        img_path = os.path.join(folder_dir, profile, file_name)  # (resized_data, 000004_male_Asian_54, mask1.jpg)
+                        mask_label = self._file_names[_file_name]
 
-                    total_label = self.encode_multi_class(mask_label, gender_label, age_label)
+                        id, gender, race, age = profile.split("_")
+                        gender_label = GenderLabels.from_str(gender)
+                        age_label = AgeLabels.from_number(age)
 
-                    self.image_paths.append(img_path)
-                    self.mask_labels.append(mask_label)
-                    self.gender_labels.append(gender_label)
-                    self.age_labels.append(age_label)
-                    self.total_labels.append(total_label)
+                        total_label = self.encode_multi_class(mask_label, gender_label, age_label)
 
-                    self.classes_hist[total_label] = self.classes_hist[total_label] + 1
+                        self.image_paths.append(img_path)
+                        self.mask_labels.append(mask_label)
+                        self.gender_labels.append(gender_label)
+                        self.age_labels.append(age_label)
+                        self.total_labels.append(total_label)
 
-                    self.indices[phase].append(cnt)
-                    cnt += 1
+                        self.classes_hist[total_label] = self.classes_hist[total_label] + 1
+
+                        self.indices[phase].append(cnt)
+                        cnt += 1
 
     def split_dataset(self) -> List[Subset]:
         self.train_idxs_in_dataset = self.indices["train"]
@@ -354,7 +366,7 @@ class TestDataset(Dataset):
     def __init__(self, img_paths, resize, mean=(0.548, 0.504, 0.479), std=(0.237, 0.247, 0.246)):
         self.img_paths = img_paths
         self.transform = Compose([
-            CenterCrop((320, 256)),
+            # CenterCrop((320, 256)),
             Resize(resize, Image.BILINEAR),
             ToTensor(),
             Normalize(mean=mean, std=std),
