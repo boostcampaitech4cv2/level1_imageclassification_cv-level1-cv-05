@@ -83,7 +83,7 @@ def increment_path(path, exist_ok=False):
         return f"{path}{n}"
 
 
-def train(data_dir, model_dir, args):
+def train(data_dir, model_dir, args, rembg_dir, usebbox):
     seed_everything(args.seed)
 
     save_dir = increment_path(os.path.join(model_dir, args.name))
@@ -96,6 +96,8 @@ def train(data_dir, model_dir, args):
     dataset_module = getattr(import_module("dataset"), args.dataset)  # default: MaskBaseDataset
     dataset = dataset_module(
         data_dir=data_dir,
+        rembg_dir=rembg_dir,
+        usebbox=usebbox,
     )
     num_classes = dataset.num_classes  # 18
 
@@ -285,5 +287,7 @@ if __name__ == '__main__':
 
     data_dir = args.data_dir
     model_dir = args.model_dir
+    rembg_dir = args.rembg_dir
+    usebbox = args.usebbox
 
-    train(data_dir, model_dir, args)
+    train(data_dir, model_dir, args, rembg_dir, usebbox)
