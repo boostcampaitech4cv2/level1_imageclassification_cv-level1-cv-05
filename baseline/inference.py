@@ -80,7 +80,7 @@ if __name__ == '__main__':
 
     # Container environment
     parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_EVAL', '/home/sshinohs/input/data/eval'))
-    parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_CHANNEL_MODEL', '/home/sshinohs/mask-project/baseline/model/Swin_Stratified_Weighted_58'))
+    parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_CHANNEL_MODEL', '/home/sshinohs/mask-project/baseline/model/Swin_Stratified_Weighted_58_rembg'))
     parser.add_argument('--output_dir', type=str, default=os.environ.get('SM_OUTPUT_DATA_DIR', './output'))
 
     args = parser.parse_args()
