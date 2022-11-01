@@ -6,6 +6,7 @@ import random
 import re
 from importlib import import_module
 from pathlib import Path
+from tqdm import tqdm
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -158,9 +159,11 @@ def train(data_dir, model_dir, args, rembg_dir):
 
     # -- model
     model_module = getattr(import_module("model"), args.model)  # default: BaseModel
-    model = model_module(
-        num_classes=num_classes
-    ).to(device)
+    model = model_module().to(device)
+    pretrained = torch.load('/opt/ml/swin_pretrained/swinv2_large_patch4_window12to24_192to384_22kto1k_ft.pth', map_location = device)['model']
+    del pretrained['head.bias']
+    del pretrained['head.weight']
+    model.load_state_dict(pretrained, strict = False)
     model = torch.nn.DataParallel(model)
 
     # -- loss & metric
@@ -169,7 +172,7 @@ def train(data_dir, model_dir, args, rembg_dir):
     optimizer = opt_module(
         filter(lambda p: p.requires_grad, model.parameters()),
         lr=args.lr,
-        weight_decay=5e-4
+        weight_decay=1e-8
     )
     scheduler = StepLR(optimizer, args.lr_decay_step, gamma=0.5)
 
@@ -225,6 +228,8 @@ def train(data_dir, model_dir, args, rembg_dir):
 
                 loss_value = 0
                 matches = 0
+                predlist = torch.tensor([], dtype = torch.int32)
+                labellist = torch.tensor([], dtype = torch.int32)
 
         scheduler.step()
 
@@ -237,7 +242,7 @@ def train(data_dir, model_dir, args, rembg_dir):
             figure = None
             predlist = torch.tensor([], dtype = torch.int32)
             labellist = torch.tensor([], dtype = torch.int32)
-            for val_batch in val_loader:
+            for val_batch in tqdm(val_loader):
                 inputs, labels = val_batch
                 inputs = inputs.to(device)
                 labels = labels.to(device)
