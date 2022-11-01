@@ -10,6 +10,7 @@ import torch
 from PIL import Image
 from torch.utils.data import Dataset, Subset, random_split
 from torchvision.transforms import Resize, ToTensor, Normalize, Compose, CenterCrop, ColorJitter
+from torchvision.transforms.functional import crop
 
 IMG_EXTENSIONS = [
     ".jpg", ".JPG", ".jpeg", ".JPEG", ".png",
@@ -126,6 +127,7 @@ class MaskBaseDataset(Dataset):
         self.gender_labels = []
         self.age_labels = []
         self.total_labels = []
+        self.bb_paths = []
         self.train_idxs_in_dataset = None
         self.val_idxs_in_dataset = None
 
@@ -133,6 +135,7 @@ class MaskBaseDataset(Dataset):
         self.mean = mean
         self.std = std
         self.val_ratio = val_ratio
+        self.bb_dir = data_dir.replace("images", "boundingbox")
 
         self.classes_hist = np.zeros(self.num_classes)
         self.transform = None
@@ -154,6 +157,8 @@ class MaskBaseDataset(Dataset):
                 img_path = os.path.join(self.data_dir, profile, file_name)  # (resized_data, 000004_male_Asian_54, mask1.jpg)
                 mask_label = self._file_names[_file_name]
 
+                bb_path = os.path.join(self.bb_dir, profile, _file_name + ".txt")  # (resized_data, 000004_male_Asian_54, mask1.txt)
+                
                 id, gender, race, age = profile.split("_")
                 gender_label = GenderLabels.from_str(gender)
                 age_label = AgeLabels.from_number(age)
@@ -165,6 +170,7 @@ class MaskBaseDataset(Dataset):
                 self.gender_labels.append(gender_label)
                 self.age_labels.append(age_label)
                 self.total_labels.append(total_label)
+                self.bb_paths.append(bb_path)
                 
                 self.classes_hist[total_label] = self.classes_hist[total_label] + 1
 
@@ -194,8 +200,13 @@ class MaskBaseDataset(Dataset):
         gender_label = self.get_gender_label(index)
         age_label = self.get_age_label(index)
         multi_class_label = self.encode_multi_class(mask_label, gender_label, age_label)
-
-        image_transform = self.transform(image)
+        bbox = self.read_boundingbox(index)
+        if bbox is None: # default : center crop
+            bbox = [0, 0, 256, 320]
+            bbox[0] = (384 - bbox[2])//2 # x
+            bbox[1] = (512 - bbox[3])//2  # y
+        
+        image_transform = self.transform(crop(image, bbox[1], bbox[0], bbox[3], bbox[2]))
         return image_transform, multi_class_label
 
     def __len__(self):
@@ -213,6 +224,19 @@ class MaskBaseDataset(Dataset):
     def read_image(self, index):
         image_path = self.image_paths[index]
         return Image.open(image_path)
+
+    def read_boundingbox(self,index):
+        bb_path = self.bb_paths[index]
+        bbox = None
+        if (os.path.isfile(bb_path)):
+            bboxfile = open(bb_path, 'r')
+            bboxcoord = bboxfile.read().split(',', maxsplit=4)
+            bbox = []
+            for i in range(4):
+                bbox.append(int(bboxcoord[i]))
+            bboxfile.close()
+    
+        return bbox
 
     @staticmethod
     def encode_multi_class(mask_label, gender_label, age_label) -> int:
