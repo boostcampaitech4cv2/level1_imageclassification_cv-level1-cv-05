@@ -267,19 +267,6 @@ class MaskBaseDataset(Dataset):
     
         return bbox
 
-    def read_boundingbox(self,index):
-        bb_path = self.bb_paths[index]
-        bbox = None
-        if (os.path.isfile(bb_path)):
-            bboxfile = open(bb_path, 'r')
-            bboxcoord = bboxfile.read().split(',', maxsplit=4)
-            bbox = []
-            for i in range(4):
-                bbox.append(int(bboxcoord[i]))
-            bboxfile.close()
-    
-        return bbox
-
     @staticmethod
     def encode_multi_class(mask_label, gender_label, age_label) -> int:
         return mask_label * 6 + gender_label * 3 + age_label
@@ -358,9 +345,9 @@ class MaskSplitByProfileDataset(MaskBaseDataset):
         이후 `split_dataset` 에서 index 에 맞게 Subset 으로 dataset 을 분기합니다.
     """
 
-    def __init__(self, data_dir, rembg_dir, mean=(0.548, 0.504, 0.479), std=(0.237, 0.247, 0.246), val_ratio=0.2):
+    def __init__(self, data_dir, rembg_dir, usebbox, mean=(0.548, 0.504, 0.479), std=(0.237, 0.247, 0.246), val_ratio=0.2):
         self.indices = defaultdict(list)
-        super().__init__(data_dir, rembg_dir, mean, std, val_ratio)
+        super().__init__(data_dir, rembg_dir, usebbox, mean, std, val_ratio)
 
     @staticmethod
     def _split_profile(profiles, val_ratio):
@@ -398,6 +385,9 @@ class MaskSplitByProfileDataset(MaskBaseDataset):
                         img_path = os.path.join(folder_dir, profile, file_name)  # (resized_data, 000004_male_Asian_54, mask1.jpg)
                         mask_label = self._file_names[_file_name]
 
+                        if self.usebbox == 'yes':
+                            bb_path = os.path.join(self.bb_dir, profile, _file_name + ".txt")  # (resized_data, 000004_male_Asian_54, mask1.txt)
+
                         id, gender, race, age = profile.split("_")
                         gender_label = GenderLabels.from_str(gender)
                         age_label = AgeLabels.from_number(age)
@@ -415,15 +405,17 @@ class MaskSplitByProfileDataset(MaskBaseDataset):
                         self.indices[phase].append(cnt)
                         cnt += 1
 
+                        if self.usebbox == 'yes':
+                            self.bb_paths.append(bb_path)
+
     def split_dataset(self) -> List[Subset]:
         self.train_idxs_in_dataset = self.indices["train"]
         self.val_idxs_in_dataset = self.indices["val"]
             
         return [Subset(self, indices) for phase, indices in self.indices.items()]
 
-
 class TestDataset(Dataset):
-    def __init__(self, img_paths, resize, mean=(0.548, 0.504, 0.479), std=(0.237, 0.247, 0.246)):
+    def __init__(self, img_paths, bb_paths, resize, usebbox, mean=(0.548, 0.504, 0.479), std=(0.237, 0.247, 0.246)):
         self.img_paths = img_paths
         self.transform = Compose([
             # CenterCrop((320, 256)),
@@ -431,9 +423,19 @@ class TestDataset(Dataset):
             ToTensor(),
             Normalize(mean=mean, std=std),
         ])
-
+        self.usebbox = usebbox
+        if self.usebbox == 'yes':
+            self.bb_paths = bb_paths
+     
     def __getitem__(self, index):
         image = Image.open(self.img_paths[index])
+        if self.usebbox == 'yes':
+            bbox = self.read_boundingbox(index)
+            if bbox is None: # default : center crop
+                bbox = [0, 0, 224, 224]
+                bbox[0] = (384 - bbox[2])//2 # x
+                bbox[1] = (512 - bbox[3])//2  # y
+            image = crop(image, bbox[1], bbox[0], bbox[3], bbox[2])
 
         if self.transform:
             image = self.transform(image)
@@ -441,3 +443,16 @@ class TestDataset(Dataset):
 
     def __len__(self):
         return len(self.img_paths)
+
+    def read_boundingbox(self,index):
+        bb_path = self.bb_paths[index].replace("jpg", "txt")
+        bbox = None
+        if (os.path.isfile(bb_path)):
+            bboxfile = open(bb_path, 'r')
+            bboxcoord = bboxfile.read().split(',', maxsplit=4)
+            bbox = []
+            for i in range(4):
+                bbox.append(int(bboxcoord[i]))
+            bboxfile.close()
+    
+        return bbox        
