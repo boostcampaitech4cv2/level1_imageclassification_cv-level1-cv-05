@@ -6,6 +6,7 @@ import numpy as np
 
 import pandas as pd
 import torch
+import torch.nn as nn
 from torch.utils.data import DataLoader
 
 from dataset import TestDataset, MaskBaseDataset
@@ -58,12 +59,15 @@ def inference(data_dir, model_dir, output_dir, args, usebbox):
 
     print("Calculating inference results..")
     preds = []
+    softmax = nn.Softmax(dim=1)
     with torch.no_grad():
         for idx, images in enumerate(loader):
             images = images.to(device)
             pred = model(images)
             if args.voting_type == 'hard':
                 pred = pred.argmax(dim=-1)
+            else:
+                pred = softmax(pred)
             preds.extend(pred.cpu().numpy())
     
     if args.voting_type == 'soft':
