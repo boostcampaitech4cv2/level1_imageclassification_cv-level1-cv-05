@@ -2,6 +2,7 @@ import argparse
 import multiprocessing
 import os
 from importlib import import_module
+import numpy as np
 
 import pandas as pd
 import torch
@@ -58,11 +59,20 @@ def inference(data_dir, model_dir, output_dir, args):
         for idx, images in enumerate(loader):
             images = images.to(device)
             pred = model(images)
-            pred = pred.argmax(dim=-1)
+            if args.votting_type == 'hard':
+                pred = pred.argmax(dim=-1)
             preds.extend(pred.cpu().numpy())
-
-    info['ans'] = preds
-    save_path = os.path.join(output_dir, f'ViT_CE_output.csv')
+    
+    if args.votting_type == 'soft':
+        preds = np.array(preds)
+    
+    if args.votting_type == 'hard':
+        info['ans'] = preds
+    else:
+        info = info.drop(columns=['ans'])
+        info = pd.DataFrame(pd.np.column_stack([info, preds]))
+    
+    save_path = os.path.join(output_dir, f'output.csv')
     info.to_csv(save_path, index=False)
     print(f"Inference Done! Inference result saved at {save_path}")
 
@@ -71,14 +81,17 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     # Data and model checkpoints directories
-    parser.add_argument('--batch_size', type=int, default=1000, help='input batch size for validing (default: 1000)')
+    parser.add_argument('--batch_size', type=int, default=100, help='input batch size for validing (default: 1000)')
     parser.add_argument('--resize', type=tuple, default=(96, 128), help='resize size for image when you trained (default: (96, 128))')
     parser.add_argument('--model', type=str, default='BaseModel', help='model type (default: BaseModel)')
 
     # Container environment
-    parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_EVAL', '/opt/ml/input/data/eval'))
-    parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_CHANNEL_MODEL', '/opt/ml/mask-project/baseline/model/exp'))
+    # parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_EVAL', '/opt/ml/input/data/eval'))
+    parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_EVAL', 'C:/Users/SHIN/develop/input/data/eval'))
+    # parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_CHANNEL_MODEL', '/opt/ml/mask-project/baseline/model/exp'))
+    parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_CHANNEL_MODEL', 'C:/Users/SHIN/develop/mask-project/baseline/model/MaskBaseDataset_base'))
     parser.add_argument('--output_dir', type=str, default=os.environ.get('SM_OUTPUT_DATA_DIR', './output'))
+    parser.add_argument('--votting_type', type=str, default='hard', help='Output value type (soft or hard) (defalut: hard)')
 
     args = parser.parse_args()
 
