@@ -24,8 +24,7 @@ def parse_args():
     parser.add_argument('--weightedsampler', type=str, default='no', help='weighted sampler (default: no  (no, yes))')
 
     # Container environment
-    # parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_TRAIN', '/opt/ml/input/data/train/images'))
-    parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_TRAIN', 'C:/Users/SHIN/develop/input/data/train/images'))
+    parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_TRAIN', '/opt/ml/input/data/train/images'))
     parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_MODEL_DIR', './model'))
 
     return parser.parse_args()
