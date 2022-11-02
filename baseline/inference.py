@@ -71,6 +71,10 @@ def inference(data_dir, model_dir, output_dir, args):
     else:
         info = info.drop(columns=['ans'])
         info = pd.DataFrame(pd.np.column_stack([info, preds]))
+        columns_name = ["ImageID"]
+        for i in range(num_classes):
+            columns_name.append(str(i))
+        info.columns = columns_name
     
     save_path = os.path.join(output_dir, f'output.csv')
     info.to_csv(save_path, index=False)
