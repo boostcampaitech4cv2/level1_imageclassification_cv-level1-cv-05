@@ -80,7 +80,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=64, help='input batch size for validing (default: 1000)')
     parser.add_argument('--resize', type=tuple, default=(384,384), help='resize size for image when you trained (default: (96, 128))')
     parser.add_argument('--model', type=str, default='SwinTransformerV2', help='model type (default: BaseModel)')
-    parser.add_argument('--usebbox', type=str, default='yes', help='use bounding box (default: no (no, yes))')
+    parser.add_argument('--usebbox', type=str, default='no', help='use bounding box (default: no (no, yes))')
 
     # Container environment
     parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_EVAL', '/home/sshinohs/input/data/eval'))

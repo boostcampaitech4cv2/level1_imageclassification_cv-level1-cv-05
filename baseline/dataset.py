@@ -268,19 +268,6 @@ class MaskBaseDataset(Dataset):
     
         return bbox
 
-    def read_boundingbox(self,index):
-        bb_path = self.bb_paths[index]
-        bbox = None
-        if (os.path.isfile(bb_path)):
-            bboxfile = open(bb_path, 'r')
-            bboxcoord = bboxfile.read().split(',', maxsplit=4)
-            bbox = []
-            for i in range(4):
-                bbox.append(int(bboxcoord[i]))
-            bboxfile.close()
-    
-        return bbox
-
     @staticmethod
     def encode_multi_class(mask_label, gender_label, age_label) -> int:
         return mask_label * 6 + gender_label * 3 + age_label
@@ -425,12 +412,14 @@ class MaskSplitByProfileDataset(MaskBaseDataset):
                         self.indices[phase].append(cnt)
                         cnt += 1
 
+                        if self.usebbox == 'yes':
+                            self.bb_paths.append(bb_path)
+
     def split_dataset(self) -> List[Subset]:
         self.train_idxs_in_dataset = self.indices["train"]
         self.val_idxs_in_dataset = self.indices["val"]
             
         return [Subset(self, indices) for phase, indices in self.indices.items()]
-
 
 class TestDataset(Dataset):
     def __init__(self, img_paths, bb_paths, resize, usebbox, mean=(0.548, 0.504, 0.479), std=(0.237, 0.247, 0.246)):
@@ -445,6 +434,7 @@ class TestDataset(Dataset):
         if self.usebbox == 'yes':
             self.bb_paths = bb_paths
 
+     
     def __getitem__(self, index):
         image = Image.open(self.img_paths[index])
         if self.usebbox == 'yes':
