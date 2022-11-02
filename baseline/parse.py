@@ -18,18 +18,18 @@ def parse_args():
     parser.add_argument('--optimizer', type=str, default='AdamW', help='optimizer type (default: SGD)')
     parser.add_argument('--lr', type=float, default=2e-5, help='learning rate (default: 1e-3)')
     parser.add_argument('--val_ratio', type=float, default=0.2, help='ratio for validaton (default: 0.2)')
-    parser.add_argument('--criterion', type=str, default='cross_entropy', help='criterion type (default: cross_entropy)')
+    parser.add_argument('--criterion', type=str, default='focal', help='criterion type (default: cross_entropy)')
     parser.add_argument('--lr_decay_step', type=int, default=20, help='learning rate scheduler deacy step (default: 20)')
 
     parser.add_argument('--log_interval', type=int, default=100, help='how many batches to wait before logging training status')
     parser.add_argument('--name', default='Swin_Stratified_Weighted_58_rembg_focal_KFold', help='model save at {SM_MODEL_DIR}/{name}')
 
     parser.add_argument('--weightedsampler', type=str, default='yes', help='weighted sampler (default: no  (no, yes))')
-    parser.add_argument('--usebbox', type=str, default='yes', help='use bounding box (default: no  (no, yes))')
+    parser.add_argument('--usebbox', type=str, default='no', help='use bounding box (default: no  (no, yes))')
 
     # Container environment
-    parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_TRAIN', '/opt/ml/input/data/train/images'))
-    parser.add_argument('--rembg_dir', type=str, default=os.environ.get('SM_CHANNEL_TRAIN', '/opt/ml/input/data/train/images_rembg'))
+    parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_TRAIN', '/home/sshinohs/input/data/train/images'))
+    parser.add_argument('--rembg_dir', type=str, default=os.environ.get('SM_CHANNEL_TRAIN', '/home/sshinohs/input/data/train/images_rembg'))
     parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_MODEL_DIR', './model'))
 
     return parser.parse_args()

@@ -83,8 +83,8 @@ if __name__ == '__main__':
     parser.add_argument('--usebbox', type=str, default='yes', help='use bounding box (default: no (no, yes))')
 
     # Container environment
-    parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_EVAL', '/opt/ml/input/data/eval'))
-    parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_CHANNEL_MODEL', '/opt/ml/mask-project/baseline/model/Swin_Stratified_Weighted_58_rembg_focal_KFold'))
+    parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_EVAL', '/home/sshinohs/input/data/eval'))
+    parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_CHANNEL_MODEL', '/home/sshinohs/mask-project/baseline/model/Swin_Stratified_Weighted_58_rembg_focal_KFold'))
     parser.add_argument('--output_dir', type=str, default=os.environ.get('SM_OUTPUT_DATA_DIR', './output'))
 
     args = parser.parse_args()
