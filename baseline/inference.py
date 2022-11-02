@@ -2,6 +2,7 @@ import argparse
 import multiprocessing
 import os
 from importlib import import_module
+import numpy as np
 
 import pandas as pd
 import torch
@@ -63,12 +64,24 @@ def inference(data_dir, model_dir, output_dir, args, usebbox):
         for idx, images in enumerate(tqdm(loader)):
             images = images.to(device)
             pred = model(images)
-            pred = pred.argmax(dim=-1)
+            if args.voting_type == 'hard':
+                pred = pred.argmax(dim=-1)
             preds.extend(pred.cpu().numpy())
-
-    info['ans'] = preds
-    # save_path = os.path.join(output_dir, f'Stratified_with_ViT_Augment_only_ColorJitter_old_label_55_output_best.csv')
-    save_path = os.path.join(output_dir, f'Swin_Stratified_Weighted_58_rembg_focal_KFold.csv')
+    
+    if args.voting_type == 'soft':
+        preds = np.array(preds)
+    
+    if args.voting_type == 'hard':
+        info['ans'] = preds
+    else:
+        info = info.drop(columns=['ans'])
+        info = pd.DataFrame(pd.np.column_stack([info, preds]))
+        columns_name = ["ImageID"]
+        for i in range(num_classes):
+            columns_name.append(str(i))
+        info.columns = columns_name
+    
+    save_path = os.path.join(output_dir, f'output.csv')
     info.to_csv(save_path, index=False)
     print(f"Inference Done! Inference result saved at {save_path}")
 
@@ -86,6 +99,7 @@ if __name__ == '__main__':
     parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_EVAL', '/home/sshinohs/input/data/eval'))
     parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_CHANNEL_MODEL', '/home/sshinohs/mask-project/baseline/model/Swin_Stratified_Weighted_58_rembg_focal_KFold'))
     parser.add_argument('--output_dir', type=str, default=os.environ.get('SM_OUTPUT_DATA_DIR', './output'))
+    parser.add_argument('--voting_type', type=str, default='hard', help='Output value type (soft or hard) (defalut: hard)')
 
     args = parser.parse_args()
 
