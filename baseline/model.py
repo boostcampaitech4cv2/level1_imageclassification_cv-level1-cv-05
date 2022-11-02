@@ -40,9 +40,8 @@ class BaseModel(nn.Module):
 
 # Custom Model Template
 class MyModel(nn.Module):
-    def __init__(self, num_classes):
+    def __init__(self):
         super().__init__()
-
         """
         1. 위와 같이 생성자의 parameter 에 num_claases 를 포함해주세요.
         2. 나만의 모델 아키텍쳐를 디자인 해봅니다.
@@ -56,6 +55,10 @@ class MyModel(nn.Module):
         """
         return x
 
+def ResNet18():
+    resnet18 = torchvision.models.resnet18(pretrained = True)
+    resnet18.fc = nn.Linear(in_features = 512, out_features = 18)
+    return resnet18
 
 def ResNet152(num_classes):
     resnet152 = torchvision.models.resnet152(pretrained = True)

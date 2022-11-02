@@ -98,7 +98,7 @@ def train(data_dir, model_dir, args, rembg_dir, usebbox):
     dataset = dataset_module(
         data_dir=data_dir,
         rembg_dir=rembg_dir,
-        usebbox=usebbox,
+        usebbox=usebbox
     )
     num_classes = dataset.num_classes  # 18
 
