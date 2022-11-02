@@ -2,6 +2,7 @@ import argparse
 import multiprocessing
 import os
 from importlib import import_module
+import numpy as np
 
 import pandas as pd
 import torch
@@ -61,11 +62,24 @@ def inference(data_dir, model_dir, output_dir, args, usebbox):
         for idx, images in enumerate(loader):
             images = images.to(device)
             pred = model(images)
-            pred = pred.argmax(dim=-1)
+            if args.voting_type == 'hard':
+                pred = pred.argmax(dim=-1)
             preds.extend(pred.cpu().numpy())
-
-    info['ans'] = preds
-    save_path = os.path.join(output_dir, f'Stratified_with_ViT_Augment_only_ColorJitter_old_label_55_output_best.csv')
+    
+    if args.voting_type == 'soft':
+        preds = np.array(preds)
+    
+    if args.voting_type == 'hard':
+        info['ans'] = preds
+    else:
+        info = info.drop(columns=['ans'])
+        info = pd.DataFrame(pd.np.column_stack([info, preds]))
+        columns_name = ["ImageID"]
+        for i in range(num_classes):
+            columns_name.append(str(i))
+        info.columns = columns_name
+    
+    save_path = os.path.join(output_dir, f'output.csv')
     info.to_csv(save_path, index=False)
     print(f"Inference Done! Inference result saved at {save_path}")
 
@@ -75,14 +89,15 @@ if __name__ == '__main__':
 
     # Data and model checkpoints directories
     parser.add_argument('--batch_size', type=int, default=1000, help='input batch size for validing (default: 1000)')
-    parser.add_argument('--resize', type=tuple, default=(224, 224), help='resize size for image when you trained (default: (96, 128))')
-    parser.add_argument('--model', type=str, default='ViT', help='model type (default: BaseModel)')
+    parser.add_argument('--resize', type=tuple, default=(96, 128), help='resize size for image when you trained (default: (96, 128))')
+    parser.add_argument('--model', type=str, default='BaseModel', help='model type (default: BaseModel)')
     parser.add_argument('--usebbox', type=str, default='no', help='use bounding box (default: no  (no, yes))')
 
     # Container environment
     parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_EVAL', '/opt/ml/input/data/eval'))
     parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_CHANNEL_MODEL', '/opt/ml/mask-project/baseline/model/exp_stratified_with_ViT_Augment_only_ColorJitter_old_label_55'))
     parser.add_argument('--output_dir', type=str, default=os.environ.get('SM_OUTPUT_DATA_DIR', './output'))
+    parser.add_argument('--voting_type', type=str, default='hard', help='Output value type (soft or hard) (defalut: hard)')
 
     args = parser.parse_args()
 
