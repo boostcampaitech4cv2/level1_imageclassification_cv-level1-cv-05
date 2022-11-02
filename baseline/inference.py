@@ -90,10 +90,8 @@ if __name__ == '__main__':
     parser.add_argument('--model', type=str, default='BaseModel', help='model type (default: BaseModel)')
 
     # Container environment
-    # parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_EVAL', '/opt/ml/input/data/eval'))
-    parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_EVAL', 'C:/Users/SHIN/develop/input/data/eval'))
-    # parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_CHANNEL_MODEL', '/opt/ml/mask-project/baseline/model/exp'))
-    parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_CHANNEL_MODEL', 'C:/Users/SHIN/develop/mask-project/baseline/model/MaskSplitByProfile_base'))
+    parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_EVAL', '/opt/ml/input/data/eval'))
+    parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_CHANNEL_MODEL', '/opt/ml/mask-project/baseline/model/exp'))
     parser.add_argument('--output_dir', type=str, default=os.environ.get('SM_OUTPUT_DATA_DIR', './output'))
     parser.add_argument('--voting_type', type=str, default='hard', help='Output value type (soft or hard) (defalut: hard)')
 
