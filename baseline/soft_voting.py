@@ -2,7 +2,6 @@ import argparse
 import torch
 import pandas as pd
 import os
-import torch.nn as nn
 
 
 def soft_voting(single_dir, output_dir, output_name, num_classes):
@@ -20,12 +19,11 @@ def soft_voting(single_dir, output_dir, output_name, num_classes):
         data_columns.append(str(i))
 
     image_id = df_list[0]['ImageID']
-    softmax = nn.Softmax(dim=1)
 
     data_tensors = []
     for i in range(ensemble_num):
         data_tensor = torch.tensor(df_list[i][data_columns].values)
-        data_tensors.append(softmax(data_tensor)[None, :])
+        data_tensors.append(data_tensor[None, :])
 
     data_tensors = torch.cat(data_tensors, 0)    
     data_tensors = torch.sum(data_tensors, 0)

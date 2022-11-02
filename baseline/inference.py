@@ -6,6 +6,7 @@ import numpy as np
 
 import pandas as pd
 import torch
+import torch.nn as nn
 from torch.utils.data import DataLoader
 
 from dataset import TestDataset, MaskBaseDataset
@@ -60,20 +61,24 @@ def inference(data_dir, model_dir, output_dir, args, usebbox):
 
     print("Calculating inference results..")
     preds = []
+    softmax = nn.Softmax(dim=1)
     with torch.no_grad():
         for idx, images in enumerate(tqdm(loader)):
-            images = images.to(device)
-            pred = model(images)
             if args.voting_type == 'hard':
+                images = images.to(device)
+                pred = model(images)
                 pred = pred.argmax(dim=-1)
-            preds.extend(pred.cpu().numpy())
-    
-    if args.voting_type == 'soft':
-        preds = np.array(preds)
-    
+                preds.extend(pred.cpu().numpy())
+            elif args.voting_type == 'soft':
+                images = images.to(device)
+                pred = model(images)
+                pred = softmax(pred)
+                preds.extend(pred.cpu().numpy())
+
     if args.voting_type == 'hard':
         info['ans'] = preds
-    else:
+    elif args.voting_type == 'soft':
+        preds = np.array(preds)
         info = info.drop(columns=['ans'])
         info = pd.DataFrame(pd.np.column_stack([info, preds]))
         columns_name = ["ImageID"]
@@ -84,7 +89,6 @@ def inference(data_dir, model_dir, output_dir, args, usebbox):
     save_path = os.path.join(output_dir, f'output.csv')
     info.to_csv(save_path, index=False)
     print(f"Inference Done! Inference result saved at {save_path}")
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
