@@ -6,10 +6,12 @@ from typing import Tuple, List
 import random
 
 import numpy as np
+from sympy import Not
 import torch
 from PIL import Image
 from torch.utils.data import Dataset, Subset, random_split
 from torchvision.transforms import Resize, ToTensor, Normalize, Compose, CenterCrop, ColorJitter
+from torchvision.transforms.functional import crop
 
 IMG_EXTENSIONS = [
     ".jpg", ".JPG", ".jpeg", ".JPEG", ".png",
@@ -53,12 +55,12 @@ class AddGaussianNoise(object):
 class CustomAugmentation:
     def __init__(self, resize, mean, std, **args):
         self.transform = Compose([
-            CenterCrop((320, 256)),
+            # CenterCrop((320, 256)),
             Resize(resize, Image.BILINEAR),
             ColorJitter(0.1, 0.1, 0.1, 0.1),
             ToTensor(),
             Normalize(mean=mean, std=std),
-            AddGaussianNoise()
+            # AddGaussianNoise()
         ])
 
     def __call__(self, image):
@@ -100,7 +102,7 @@ class AgeLabels(int, Enum):
 
         if value < 30:
             return cls.YOUNG
-        elif value < 60:
+        elif value < 55:
             return cls.MIDDLE
         else:
             return cls.OLD
@@ -119,54 +121,83 @@ class MaskBaseDataset(Dataset):
         "normal": MaskLabels.NORMAL
     }
 
-    def __init__(self, data_dir, mean=(0.548, 0.504, 0.479), std=(0.237, 0.247, 0.246), val_ratio=0.2):
-
+    def __init__(self, data_dir, rembg_dir,  usebbox, mean=(0.548, 0.504, 0.479), std=(0.237, 0.247, 0.246), val_ratio=0.2):
         self.image_paths = []
         self.mask_labels = []
         self.gender_labels = []
         self.age_labels = []
         self.total_labels = []
+        self.bb_paths = []
         self.train_idxs_in_dataset = None
         self.val_idxs_in_dataset = None
 
         self.data_dir = data_dir
+        self.rembg_dir = rembg_dir
+        self.usebbox = usebbox
         self.mean = mean
         self.std = std
         self.val_ratio = val_ratio
+        self.bb_dir = data_dir.replace("images", "boundingbox")
 
         self.classes_hist = np.zeros(self.num_classes)
         self.transform = None
+        if (os.path.isdir(os.path.join(self.rembg_dir))):
+            self.userembg = True
+        else:
+            self.userembg = False
+        
         self.setup()
         self.calc_statistics()
 
+        if self.usebbox == 'yes':
+            bb_path = os.path.join(self.bb_dir)
+            print("use bounding box with this path : ", bb_path)
+    
     def setup(self):
         profiles = os.listdir(self.data_dir)
         for profile in profiles:
             if profile.startswith("."):  # "." 로 시작하는 파일은 무시합니다
                 continue
-
-            img_folder = os.path.join(self.data_dir, profile)
-            for file_name in os.listdir(img_folder):
-                _file_name, ext = os.path.splitext(file_name)
-                if _file_name not in self._file_names:  # "." 로 시작하는 파일 및 invalid 한 파일들은 무시합니다
-                    continue
-
-                img_path = os.path.join(self.data_dir, profile, file_name)  # (resized_data, 000004_male_Asian_54, mask1.jpg)
-                mask_label = self._file_names[_file_name]
-
-                id, gender, race, age = profile.split("_")
-                gender_label = GenderLabels.from_str(gender)
-                age_label = AgeLabels.from_number(age)
-
-                total_label = self.encode_multi_class(mask_label, gender_label, age_label)
-
-                self.image_paths.append(img_path)
-                self.mask_labels.append(mask_label)
-                self.gender_labels.append(gender_label)
-                self.age_labels.append(age_label)
-                self.total_labels.append(total_label)
+        
+            if self.userembg:
+                img_folders = [os.path.join(self.data_dir, profile), os.path.join(self.rembg_dir, profile)]
+            else:
+                img_folders = [os.path.join(self.data_dir, profile)]
                 
-                self.classes_hist[total_label] = self.classes_hist[total_label] + 1
+            for idx_folder, img_folder in enumerate(img_folders):
+                if idx_folder == 0:
+                    folder_dir = self.data_dir
+                else:
+                    folder_dir = self.rembg_dir
+                
+                for file_name in os.listdir(img_folder):
+                    _file_name, ext = os.path.splitext(file_name)
+                    if _file_name not in self._file_names:  # "." 로 시작하는 파일 및 invalid 한 파일들은 무시합니다
+                        continue
+
+                    img_path = os.path.join(folder_dir, profile, file_name)  # (resized_data, 000004_male_Asian_54, mask1.jpg)
+                    
+                    mask_label = self._file_names[_file_name]
+
+                    if self.usebbox == 'yes':
+                        bb_path = os.path.join(self.bb_dir, profile, _file_name + ".txt")  # (resized_data, 000004_male_Asian_54, mask1.txt)
+                
+                    id, gender, race, age = profile.split("_")
+                    gender_label = GenderLabels.from_str(gender)
+                    age_label = AgeLabels.from_number(age)
+
+                    total_label = self.encode_multi_class(mask_label, gender_label, age_label)
+
+                    self.image_paths.append(img_path)
+                    self.mask_labels.append(mask_label)
+                    self.gender_labels.append(gender_label)
+                    self.age_labels.append(age_label)
+                    self.total_labels.append(total_label)
+                    
+                    if self.usebbox == 'yes':
+                        self.bb_paths.append(bb_path)
+                    
+                    self.classes_hist[total_label] = self.classes_hist[total_label] + 1
 
 
     def calc_statistics(self):
@@ -194,8 +225,17 @@ class MaskBaseDataset(Dataset):
         gender_label = self.get_gender_label(index)
         age_label = self.get_age_label(index)
         multi_class_label = self.encode_multi_class(mask_label, gender_label, age_label)
-
-        image_transform = self.transform(image)
+        if self.usebbox == 'yes':
+            bbox = self.read_boundingbox(index)
+            if bbox is None: # default : center crop
+                bbox = [0, 0, 224, 224]
+                bbox[0] = (384 - bbox[2])//2 # x
+                bbox[1] = (512 - bbox[3])//2  # y
+            
+            image_transform = self.transform(crop(image, bbox[1], bbox[0], bbox[3], bbox[2]))
+        else:
+            image_transform = self.transform(image)
+            
         return image_transform, multi_class_label
 
     def __len__(self):
@@ -212,7 +252,20 @@ class MaskBaseDataset(Dataset):
 
     def read_image(self, index):
         image_path = self.image_paths[index]
-        return Image.open(image_path)
+        return Image.open(image_path).convert('RGB')
+
+    def read_boundingbox(self,index):
+        bb_path = self.bb_paths[index]
+        bbox = None
+        if (os.path.isfile(bb_path)):
+            bboxfile = open(bb_path, 'r')
+            bboxcoord = bboxfile.read().split(',', maxsplit=4)
+            bbox = []
+            for i in range(4):
+                bbox.append(int(bboxcoord[i]))
+            bboxfile.close()
+    
+        return bbox
 
     @staticmethod
     def encode_multi_class(mask_label, gender_label, age_label) -> int:
@@ -262,8 +315,8 @@ class MaskStratifiedDataset(MaskBaseDataset):
         train / val 나누는 기준을 class의 비율을 유지하면서 나눕니다.
     """
 
-    def __init__(self, data_dir, mean=(0.548, 0.504, 0.479), std=(0.237, 0.247, 0.246), val_ratio=0.2):
-        super().__init__(data_dir, mean, std, val_ratio)
+    def __init__(self, data_dir, rembg_dir, usebbox, mean=(0.548, 0.504, 0.479), std=(0.237, 0.247, 0.246), val_ratio=0.2):
+        super().__init__(data_dir, rembg_dir, usebbox, mean, std, val_ratio)
     
     def split_dataset(self) -> Tuple[Subset, Subset]:
         indices_per_label = defaultdict(list)
@@ -292,9 +345,9 @@ class MaskSplitByProfileDataset(MaskBaseDataset):
         이후 `split_dataset` 에서 index 에 맞게 Subset 으로 dataset 을 분기합니다.
     """
 
-    def __init__(self, data_dir, mean=(0.548, 0.504, 0.479), std=(0.237, 0.247, 0.246), val_ratio=0.2):
+    def __init__(self, data_dir, rembg_dir, usebbox, mean=(0.548, 0.504, 0.479), std=(0.237, 0.247, 0.246), val_ratio=0.2):
         self.indices = defaultdict(list)
-        super().__init__(data_dir, mean, std, val_ratio)
+        super().__init__(data_dir, rembg_dir, usebbox, mean, std, val_ratio)
 
     @staticmethod
     def _split_profile(profiles, val_ratio):
@@ -317,31 +370,43 @@ class MaskSplitByProfileDataset(MaskBaseDataset):
         for phase, indices in split_profiles.items():
             for _idx in indices:
                 profile = profiles[_idx]
-                img_folder = os.path.join(self.data_dir, profile)
-                for file_name in os.listdir(img_folder):
-                    _file_name, ext = os.path.splitext(file_name)
-                    if _file_name not in self._file_names:  # "." 로 시작하는 파일 및 invalid 한 파일들은 무시합니다
-                        continue
+                img_folders = [os.path.join(self.data_dir, profile), os.path.join(self.rembg_dir, profile)]
 
-                    img_path = os.path.join(self.data_dir, profile, file_name)  # (resized_data, 000004_male_Asian_54, mask1.jpg)
-                    mask_label = self._file_names[_file_name]
+                for idx_folder, img_folder in enumerate(img_folders):
+                    if idx_folder == 0:
+                        folder_dir = self.data_dir
+                    else:
+                        folder_dir = self.rembg_dir
+                    for file_name in os.listdir(img_folder):
+                        _file_name, ext = os.path.splitext(file_name)
+                        if _file_name not in self._file_names:  # "." 로 시작하는 파일 및 invalid 한 파일들은 무시합니다
+                            continue
 
-                    id, gender, race, age = profile.split("_")
-                    gender_label = GenderLabels.from_str(gender)
-                    age_label = AgeLabels.from_number(age)
+                        img_path = os.path.join(folder_dir, profile, file_name)  # (resized_data, 000004_male_Asian_54, mask1.jpg)
+                        mask_label = self._file_names[_file_name]
 
-                    total_label = self.encode_multi_class(mask_label, gender_label, age_label)
+                        if self.usebbox == 'yes':
+                            bb_path = os.path.join(self.bb_dir, profile, _file_name + ".txt")  # (resized_data, 000004_male_Asian_54, mask1.txt)
 
-                    self.image_paths.append(img_path)
-                    self.mask_labels.append(mask_label)
-                    self.gender_labels.append(gender_label)
-                    self.age_labels.append(age_label)
-                    self.total_labels.append(total_label)
+                        id, gender, race, age = profile.split("_")
+                        gender_label = GenderLabels.from_str(gender)
+                        age_label = AgeLabels.from_number(age)
 
-                    self.classes_hist[total_label] = self.classes_hist[total_label] + 1
+                        total_label = self.encode_multi_class(mask_label, gender_label, age_label)
 
-                    self.indices[phase].append(cnt)
-                    cnt += 1
+                        self.image_paths.append(img_path)
+                        self.mask_labels.append(mask_label)
+                        self.gender_labels.append(gender_label)
+                        self.age_labels.append(age_label)
+                        self.total_labels.append(total_label)
+
+                        self.classes_hist[total_label] = self.classes_hist[total_label] + 1
+
+                        self.indices[phase].append(cnt)
+                        cnt += 1
+
+                        if self.usebbox == 'yes':
+                            self.bb_paths.append(bb_path)
 
     def split_dataset(self) -> List[Subset]:
         self.train_idxs_in_dataset = self.indices["train"]
@@ -349,19 +414,28 @@ class MaskSplitByProfileDataset(MaskBaseDataset):
             
         return [Subset(self, indices) for phase, indices in self.indices.items()]
 
-
 class TestDataset(Dataset):
-    def __init__(self, img_paths, resize, mean=(0.548, 0.504, 0.479), std=(0.237, 0.247, 0.246)):
+    def __init__(self, img_paths, bb_paths, resize, usebbox, mean=(0.548, 0.504, 0.479), std=(0.237, 0.247, 0.246)):
         self.img_paths = img_paths
         self.transform = Compose([
-            CenterCrop((320, 256)),
+            # CenterCrop((320, 256)),
             Resize(resize, Image.BILINEAR),
             ToTensor(),
             Normalize(mean=mean, std=std),
         ])
-
+        self.usebbox = usebbox
+        if self.usebbox == 'yes':
+            self.bb_paths = bb_paths
+     
     def __getitem__(self, index):
         image = Image.open(self.img_paths[index])
+        if self.usebbox == 'yes':
+            bbox = self.read_boundingbox(index)
+            if bbox is None: # default : center crop
+                bbox = [0, 0, 224, 224]
+                bbox[0] = (384 - bbox[2])//2 # x
+                bbox[1] = (512 - bbox[3])//2  # y
+            image = crop(image, bbox[1], bbox[0], bbox[3], bbox[2])
 
         if self.transform:
             image = self.transform(image)
@@ -369,3 +443,16 @@ class TestDataset(Dataset):
 
     def __len__(self):
         return len(self.img_paths)
+
+    def read_boundingbox(self,index):
+        bb_path = self.bb_paths[index].replace("jpg", "txt")
+        bbox = None
+        if (os.path.isfile(bb_path)):
+            bboxfile = open(bb_path, 'r')
+            bboxcoord = bboxfile.read().split(',', maxsplit=4)
+            bbox = []
+            for i in range(4):
+                bbox.append(int(bboxcoord[i]))
+            bboxfile.close()
+    
+        return bbox        
