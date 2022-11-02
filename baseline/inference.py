@@ -59,14 +59,14 @@ def inference(data_dir, model_dir, output_dir, args):
         for idx, images in enumerate(loader):
             images = images.to(device)
             pred = model(images)
-            if args.votting_type == 'hard':
+            if args.voting_type == 'hard':
                 pred = pred.argmax(dim=-1)
             preds.extend(pred.cpu().numpy())
     
-    if args.votting_type == 'soft':
+    if args.voting_type == 'soft':
         preds = np.array(preds)
     
-    if args.votting_type == 'hard':
+    if args.voting_type == 'hard':
         info['ans'] = preds
     else:
         info = info.drop(columns=['ans'])
@@ -93,9 +93,9 @@ if __name__ == '__main__':
     # parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_EVAL', '/opt/ml/input/data/eval'))
     parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_EVAL', 'C:/Users/SHIN/develop/input/data/eval'))
     # parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_CHANNEL_MODEL', '/opt/ml/mask-project/baseline/model/exp'))
-    parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_CHANNEL_MODEL', 'C:/Users/SHIN/develop/mask-project/baseline/model/MaskBaseDataset_base'))
+    parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_CHANNEL_MODEL', 'C:/Users/SHIN/develop/mask-project/baseline/model/MaskSplitByProfile_base'))
     parser.add_argument('--output_dir', type=str, default=os.environ.get('SM_OUTPUT_DATA_DIR', './output'))
-    parser.add_argument('--votting_type', type=str, default='hard', help='Output value type (soft or hard) (defalut: hard)')
+    parser.add_argument('--voting_type', type=str, default='hard', help='Output value type (soft or hard) (defalut: hard)')
 
     args = parser.parse_args()
 
