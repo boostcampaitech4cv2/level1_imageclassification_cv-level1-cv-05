@@ -62,16 +62,13 @@ def inference(data_dir, model_dir, output_dir, args, usebbox):
     softmax = nn.Softmax(dim=1)
     with torch.no_grad():
         for idx, images in enumerate(loader):
+            images = images.to(device)
+            pred = model(images)
             if args.voting_type == 'hard':
-                images = images.to(device)
-                pred = model(images)
                 pred = pred.argmax(dim=-1)
-                preds.extend(pred.cpu().numpy())
             elif args.voting_type == 'soft':
-                images = images.to(device)
-                pred = model(images)
                 pred = softmax(pred)
-                preds.extend(pred.cpu().numpy())
+            preds.extend(pred.cpu().numpy())
 
     if args.voting_type == 'hard':
         info['ans'] = preds
