@@ -65,7 +65,7 @@ def inference(data_dir, model_dir, output_dir, args):
 
     info['ans'] = preds
     # save_path = os.path.join(output_dir, f'Stratified_with_ViT_Augment_only_ColorJitter_old_label_55_output_best.csv')
-    save_path = os.path.join(output_dir, f'Swin_Large_CE_58_output_best.csv')
+    save_path = os.path.join(output_dir, f'Swin_Stratified_Weighted_59_rembg_focal_best.csv')
     info.to_csv(save_path, index=False)
     print(f"Inference Done! Inference result saved at {save_path}")
 
@@ -74,13 +74,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     # Data and model checkpoints directories
-    parser.add_argument('--batch_size', type=int, default=256, help='input batch size for validing (default: 1000)')
+    parser.add_argument('--batch_size', type=int, default=64, help='input batch size for validing (default: 1000)')
     parser.add_argument('--resize', type=tuple, default=(384,384), help='resize size for image when you trained (default: (96, 128))')
     parser.add_argument('--model', type=str, default='SwinTransformerV2', help='model type (default: BaseModel)')
 
     # Container environment
-    parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_EVAL', '/home/sshinohs/input/data/eval'))
-    parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_CHANNEL_MODEL', '/home/sshinohs/mask-project/baseline/model/Swin_Stratified_Weighted_58_rembg'))
+    parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_EVAL', '/opt/ml/input/data/eval'))
+    parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_CHANNEL_MODEL', '/opt/ml/mask-project/baseline/model/Swin_Stratified_Weighted_59_rembg_focal'))
     parser.add_argument('--output_dir', type=str, default=os.environ.get('SM_OUTPUT_DATA_DIR', './output'))
 
     args = parser.parse_args()
