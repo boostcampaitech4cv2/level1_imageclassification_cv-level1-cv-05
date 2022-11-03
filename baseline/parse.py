@@ -12,7 +12,7 @@ def parse_args():
     parser.add_argument('--dataset', type=str, default='MaskStratifiedDataset', help='dataset augmentation type (default: MaskBaseDataset)')
     parser.add_argument('--augmentation', type=str, default='CustomAugmentation', help='data augmentation type (default: BaseAugmentation)')
     parser.add_argument("--resize", nargs="+", type=list, default=[384, 384], help='resize size for image when training')
-    parser.add_argument('--batch_size', type=int, default=4, help='input batch size for training (default: 64)')
+    parser.add_argument('--batch_size', type=int, default=8, help='input batch size for training (default: 64)')
     parser.add_argument('--valid_batch_size', type=int, default=64, help='input batch size for validing (default: 1000)')
     parser.add_argument('--model', type=str, default='SwinTransformerV2', help='model type (default: BaseModel)')
     parser.add_argument('--optimizer', type=str, default='AdamW', help='optimizer type (default: SGD)')

@@ -161,7 +161,7 @@ def train(data_dir, model_dir, args, rembg_dir, usebbox):
     # -- model
     model_module = getattr(import_module("model"), args.model)  # default: BaseModel
     model = model_module().to(device)
-    pretrained = torch.load('/opt/ml/swin_pretrained/swinv2_large_patch4_window12to24_192to384_22kto1k_ft.pth', map_location = device)['model']
+    pretrained = torch.load('/home/sshinohs/swin_pretrained/swinv2_large_patch4_window12to24_192to384_22kto1k_ft.pth', map_location = device)['model']
     del pretrained['head.bias']
     del pretrained['head.weight']
     model.load_state_dict(pretrained, strict = False)
