@@ -449,7 +449,7 @@ class TestDataset(Dataset):
         if self.usebbox == 'yes':
             bbox = self.read_boundingbox(index)
             if bbox is None: # default : center crop
-                bbox = [0, 0, 224, 224]
+                bbox = [0, 0, 256, 320]
                 bbox[0] = (384 - bbox[2])//2 # x
                 bbox[1] = (512 - bbox[3])//2  # y
             image = crop(image, bbox[1], bbox[0], bbox[3], bbox[2])
