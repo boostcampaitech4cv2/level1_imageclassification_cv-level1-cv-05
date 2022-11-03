@@ -2,6 +2,8 @@ import argparse
 import multiprocessing
 import os
 from importlib import import_module
+from tqdm import tqdm
+
 
 import numpy as np
 import pandas as pd
@@ -9,8 +11,6 @@ import torch
 from torch.utils.data import DataLoader
 
 from dataset import TestDataset, MaskBaseDataset
-
-from tqdm import tqdm
 
 
 def load_model(saved_model, num_classes, device):
@@ -46,7 +46,7 @@ def inference(data_dir, model_dirs, output_dir, args, usebbox):
         img_root = os.path.join(data_dir, 'images')
         info_path = os.path.join(data_dir, 'info.csv')
         info = pd.read_csv(info_path)
-        bb_root = os.path.join(data_dir, 'boundingbox')  
+        bb_root = os.path.join(data_dir, 'boundingbox')
 
         img_paths = [os.path.join(img_root, img_id) for img_id in info.ImageID]
         bb_paths = [os.path.join(bb_root, img_id) for img_id in info.ImageID]
@@ -67,18 +67,19 @@ def inference(data_dir, model_dirs, output_dir, args, usebbox):
             for idx, images in enumerate(tqdm(loader)):
                 images = images.to(device)
                 pred = model(images) / 2
-                pred += model(torch.flip(images, dims = (-1,))) / 2
+                pred += model(torch.flip(images, dims=(-1,))) / 2
                 preds.extend(pred.cpu().numpy())
-                
+
             fold_pred = np.array(preds)
-        
+
         if oof_pred is None:
             oof_pred = fold_pred / n_splits
         else:
             oof_pred += fold_pred / n_splits
 
-    info['ans'] = np.argmax(oof_pred, axis = 1)
-    save_path = os.path.join(output_dir, f'Swin_Large_Weighted_Profile_bbox_58_KFold.csv')
+    info['ans'] = np.argmax(oof_pred, axis=1)
+    save_path = os.path.join(
+        output_dir, f'Swin_Large_Weighted_Profile_bbox_58_KFold.csv')
     info.to_csv(save_path, index=False)
     print(f"Inference Done! Inference result saved at {save_path}")
 
@@ -87,15 +88,21 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     # Data and model checkpoints directories
-    parser.add_argument('--batch_size', type=int, default=64, help='input batch size for validing (default: 1000)')
-    parser.add_argument('--resize', type=tuple, default=(384,384), help='resize size for image when you trained (default: (96, 128))')
-    parser.add_argument('--model', type=str, default='SwinTransformerV2', help='model type (default: BaseModel)')
-    parser.add_argument('--usebbox', type=str, default='yes', help='use bounding box (default: no (no, yes))')
+    parser.add_argument('--batch_size', type=int, default=64,
+                        help='input batch size for validing (default: 1000)')
+    parser.add_argument('--resize', type=tuple, default=(384, 384),
+                        help='resize size for image when you trained (default: (96, 128))')
+    parser.add_argument('--model', type=str, default='SwinTransformerV2',
+                        help='model type (default: BaseModel)')
+    parser.add_argument('--usebbox', type=str, default='yes',
+                        help='use bounding box (default: no (no, yes))')
 
     # Container environment
-    parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_EVAL', '/opt/ml/input/data/eval'))
+    parser.add_argument('--data_dir', type=str,
+                        default=os.environ.get('SM_CHANNEL_EVAL', '/opt/ml/input/data/eval'))
     # parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_CHANNEL_MODEL', '/opt/ml/model/Swin_Large_Weighted_Stratified_bbox_rem_58'))
-    parser.add_argument('--output_dir', type=str, default=os.environ.get('SM_OUTPUT_DATA_DIR', './output'))
+    parser.add_argument('--output_dir', type=str,
+                        default=os.environ.get('SM_OUTPUT_DATA_DIR', './output'))
 
     args = parser.parse_args()
 

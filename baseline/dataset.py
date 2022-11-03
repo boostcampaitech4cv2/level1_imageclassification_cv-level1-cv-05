@@ -85,7 +85,8 @@ class GenderLabels(int, Enum):
         elif value == "female":
             return cls.FEMALE
         else:
-            raise ValueError(f"Gender value should be either 'male' or 'female', {value}")
+            raise ValueError(
+                f"Gender value should be either 'male' or 'female', {value}")
 
 
 class AgeLabels(int, Enum):
@@ -145,65 +146,70 @@ class MaskBaseDataset(Dataset):
             self.userembg = True
         else:
             self.userembg = False
-        
+
         self.setup()
         self.calc_statistics()
 
         if self.usebbox == 'yes':
             bb_path = os.path.join(self.bb_dir)
             print("use bounding box with this path : ", bb_path)
-    
+
     def setup(self):
         profiles = os.listdir(self.data_dir)
         for profile in profiles:
             if profile.startswith("."):  # "." 로 시작하는 파일은 무시합니다
                 continue
-        
+
             if self.userembg:
-                img_folders = [os.path.join(self.data_dir, profile), os.path.join(self.rembg_dir, profile)]
+                img_folders = [os.path.join(self.data_dir, profile), os.path.join(
+                    self.rembg_dir, profile)]
             else:
                 img_folders = [os.path.join(self.data_dir, profile)]
-                
+
             for idx_folder, img_folder in enumerate(img_folders):
                 if idx_folder == 0:
                     folder_dir = self.data_dir
                 else:
                     folder_dir = self.rembg_dir
-                
+
                 for file_name in os.listdir(img_folder):
                     _file_name, ext = os.path.splitext(file_name)
                     if _file_name not in self._file_names:  # "." 로 시작하는 파일 및 invalid 한 파일들은 무시합니다
                         continue
 
-                    img_path = os.path.join(folder_dir, profile, file_name)  # (resized_data, 000004_male_Asian_54, mask1.jpg)
-                    
+                    # (resized_data, 000004_male_Asian_54, mask1.jpg)
+                    img_path = os.path.join(folder_dir, profile, file_name)
+
                     mask_label = self._file_names[_file_name]
 
                     if self.usebbox == 'yes':
-                        bb_path = os.path.join(self.bb_dir, profile, _file_name + ".txt")  # (resized_data, 000004_male_Asian_54, mask1.txt)
-                
+                        # (resized_data, 000004_male_Asian_54, mask1.txt)
+                        bb_path = os.path.join(
+                            self.bb_dir, profile, _file_name + ".txt")
+
                     id, gender, race, age = profile.split("_")
                     gender_label = GenderLabels.from_str(gender)
                     age_label = AgeLabels.from_number(age)
 
-                    total_label = self.encode_multi_class(mask_label, gender_label, age_label)
+                    total_label = self.encode_multi_class(
+                        mask_label, gender_label, age_label)
 
                     self.image_paths.append(img_path)
                     self.mask_labels.append(mask_label)
                     self.gender_labels.append(gender_label)
                     self.age_labels.append(age_label)
                     self.total_labels.append(total_label)
-                    
+
                     if self.usebbox == 'yes':
                         self.bb_paths.append(bb_path)
-                    
-                    self.classes_hist[total_label] = self.classes_hist[total_label] + 1
 
+                    self.classes_hist[total_label] = self.classes_hist[total_label] + 1
 
     def calc_statistics(self):
         has_statistics = self.mean is not None and self.std is not None
         if not has_statistics:
-            print("[Warning] Calculating statistics... It can take a long time depending on your CPU machine")
+            print(
+                "[Warning] Calculating statistics... It can take a long time depending on your CPU machine")
             sums = []
             squared = []
             for image_path in self.image_paths[:3000]:
@@ -224,18 +230,20 @@ class MaskBaseDataset(Dataset):
         mask_label = self.get_mask_label(index)
         gender_label = self.get_gender_label(index)
         age_label = self.get_age_label(index)
-        multi_class_label = self.encode_multi_class(mask_label, gender_label, age_label)
+        multi_class_label = self.encode_multi_class(
+            mask_label, gender_label, age_label)
         if self.usebbox == 'yes':
             bbox = self.read_boundingbox(index)
-            if bbox is None: # default : center crop
+            if bbox is None:  # default : center crop
                 bbox = [0, 0, 256, 320]
-                bbox[0] = (384 - bbox[2])//2 # x
+                bbox[0] = (384 - bbox[2])//2  # x
                 bbox[1] = (512 - bbox[3])//2  # y
-            
-            image_transform = self.transform(crop(image, bbox[1], bbox[0], bbox[3], bbox[2]))
+
+            image_transform = self.transform(
+                crop(image, bbox[1], bbox[0], bbox[3], bbox[2]))
         else:
             image_transform = self.transform(image)
-            
+
         return image_transform, multi_class_label
 
     def __len__(self):
@@ -254,7 +262,7 @@ class MaskBaseDataset(Dataset):
         image_path = self.image_paths[index]
         return Image.open(image_path).convert('RGB')
 
-    def read_boundingbox(self,index):
+    def read_boundingbox(self, index):
         bb_path = self.bb_paths[index]
         bbox = None
         if (os.path.isfile(bb_path)):
@@ -264,7 +272,7 @@ class MaskBaseDataset(Dataset):
             for i in range(4):
                 bbox.append(int(bboxcoord[i]))
             bboxfile.close()
-    
+
         return bbox
 
     @staticmethod
@@ -308,7 +316,7 @@ class MaskBaseDataset(Dataset):
         self.val_idxs_in_dataset = val_set_indices
 
         return train_set, val_set
-    
+
 
 class MaskStratifiedDataset(MaskBaseDataset):
     """
@@ -317,7 +325,7 @@ class MaskStratifiedDataset(MaskBaseDataset):
 
     def __init__(self, data_dir, rembg_dir, usebbox, mean=(0.548, 0.504, 0.479), std=(0.237, 0.247, 0.246), val_ratio=0.2):
         super().__init__(data_dir, rembg_dir, usebbox, mean, std, val_ratio)
-    
+
     def split_dataset(self) -> Tuple[Subset, Subset]:
         indices_per_label = defaultdict(list)
         for index, label in enumerate(self.total_labels):
@@ -363,7 +371,8 @@ class MaskSplitByProfileDataset(MaskBaseDataset):
 
     def setup(self):
         profiles = os.listdir(self.data_dir)
-        profiles = [profile for profile in profiles if not profile.startswith(".")]
+        profiles = [
+            profile for profile in profiles if not profile.startswith(".")]
         split_profiles = self._split_profile(profiles, self.val_ratio)
 
         cnt = 0
@@ -371,7 +380,8 @@ class MaskSplitByProfileDataset(MaskBaseDataset):
             for _idx in indices:
                 profile = profiles[_idx]
                 if self.userembg:
-                    img_folders = [os.path.join(self.data_dir, profile), os.path.join(self.rembg_dir, profile)]
+                    img_folders = [os.path.join(self.data_dir, profile), os.path.join(
+                        self.rembg_dir, profile)]
                 else:
                     img_folders = [os.path.join(self.data_dir, profile)]
 
@@ -385,17 +395,21 @@ class MaskSplitByProfileDataset(MaskBaseDataset):
                         if _file_name not in self._file_names:  # "." 로 시작하는 파일 및 invalid 한 파일들은 무시합니다
                             continue
 
-                        img_path = os.path.join(folder_dir, profile, file_name)  # (resized_data, 000004_male_Asian_54, mask1.jpg)
+                        # (resized_data, 000004_male_Asian_54, mask1.jpg)
+                        img_path = os.path.join(folder_dir, profile, file_name)
                         mask_label = self._file_names[_file_name]
 
                         if self.usebbox == 'yes':
-                            bb_path = os.path.join(self.bb_dir, profile, _file_name + ".txt")  # (resized_data, 000004_male_Asian_54, mask1.txt)
+                            # (resized_data, 000004_male_Asian_54, mask1.txt)
+                            bb_path = os.path.join(
+                                self.bb_dir, profile, _file_name + ".txt")
 
                         id, gender, race, age = profile.split("_")
                         gender_label = GenderLabels.from_str(gender)
                         age_label = AgeLabels.from_number(age)
 
-                        total_label = self.encode_multi_class(mask_label, gender_label, age_label)
+                        total_label = self.encode_multi_class(
+                            mask_label, gender_label, age_label)
 
                         self.image_paths.append(img_path)
                         self.mask_labels.append(mask_label)
@@ -417,8 +431,9 @@ class MaskSplitByProfileDataset(MaskBaseDataset):
     def split_dataset(self) -> List[Subset]:
         self.train_idxs_in_dataset = self.indices["train"]
         self.val_idxs_in_dataset = self.indices["val"]
-            
+
         return [Subset(self, indices) for phase, indices in self.indices.items()]
+
 
 class TestDataset(Dataset):
     def __init__(self, img_paths, bb_paths, resize, usebbox, mean=(0.548, 0.504, 0.479), std=(0.237, 0.247, 0.246)):
@@ -437,9 +452,9 @@ class TestDataset(Dataset):
         image = Image.open(self.img_paths[index])
         if self.usebbox == 'yes':
             bbox = self.read_boundingbox(index)
-            if bbox is None: # default : center crop
+            if bbox is None:  # default : center crop
                 bbox = [0, 0, 256, 320]
-                bbox[0] = (384 - bbox[2])//2 # x
+                bbox[0] = (384 - bbox[2])//2  # x
                 bbox[1] = (512 - bbox[3])//2  # y
             image = crop(image, bbox[1], bbox[0], bbox[3], bbox[2])
 
@@ -450,7 +465,7 @@ class TestDataset(Dataset):
     def __len__(self):
         return len(self.img_paths)
 
-    def read_boundingbox(self,index):
+    def read_boundingbox(self, index):
         bb_path = self.bb_paths[index].replace("jpg", "txt")
         bbox = None
         if (os.path.isfile(bb_path)):
@@ -460,4 +475,4 @@ class TestDataset(Dataset):
             for i in range(4):
                 bbox.append(int(bboxcoord[i]))
             bboxfile.close()
-        return bbox        
+        return bbox
