@@ -69,7 +69,6 @@ def inference(data_dir, model_dir, output_dir, args, usebbox):
             elif args.voting_type == 'soft':
                 pred = softmax(pred)
             preds.extend(pred.cpu().numpy())
-
     if args.voting_type == 'hard':
         info['ans'] = preds
     elif args.voting_type == 'soft':
