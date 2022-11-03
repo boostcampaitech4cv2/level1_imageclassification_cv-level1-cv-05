@@ -102,7 +102,7 @@ class AgeLabels(int, Enum):
 
         if value < 30:
             return cls.YOUNG
-        elif value < 55:
+        elif value < 58:
             return cls.MIDDLE
         else:
             return cls.OLD
@@ -228,7 +228,7 @@ class MaskBaseDataset(Dataset):
         if self.usebbox == 'yes':
             bbox = self.read_boundingbox(index)
             if bbox is None: # default : center crop
-                bbox = [0, 0, 224, 224]
+                bbox = [0, 0, 256, 320]
                 bbox[0] = (384 - bbox[2])//2 # x
                 bbox[1] = (512 - bbox[3])//2  # y
             
@@ -370,7 +370,10 @@ class MaskSplitByProfileDataset(MaskBaseDataset):
         for phase, indices in split_profiles.items():
             for _idx in indices:
                 profile = profiles[_idx]
-                img_folders = [os.path.join(self.data_dir, profile), os.path.join(self.rembg_dir, profile)]
+                if self.userembg:
+                    img_folders = [os.path.join(self.data_dir, profile), os.path.join(self.rembg_dir, profile)]
+                else:
+                    img_folders = [os.path.join(self.data_dir, profile)]
 
                 for idx_folder, img_folder in enumerate(img_folders):
                     if idx_folder == 0:
@@ -400,6 +403,9 @@ class MaskSplitByProfileDataset(MaskBaseDataset):
                         self.age_labels.append(age_label)
                         self.total_labels.append(total_label)
 
+                        if self.usebbox == 'yes':
+                            self.bb_paths.append(bb_path)
+
                         self.classes_hist[total_label] = self.classes_hist[total_label] + 1
 
                         self.indices[phase].append(cnt)
@@ -426,13 +432,13 @@ class TestDataset(Dataset):
         self.usebbox = usebbox
         if self.usebbox == 'yes':
             self.bb_paths = bb_paths
-     
+
     def __getitem__(self, index):
         image = Image.open(self.img_paths[index])
         if self.usebbox == 'yes':
             bbox = self.read_boundingbox(index)
             if bbox is None: # default : center crop
-                bbox = [0, 0, 224, 224]
+                bbox = [0, 0, 256, 320]
                 bbox[0] = (384 - bbox[2])//2 # x
                 bbox[1] = (512 - bbox[3])//2  # y
             image = crop(image, bbox[1], bbox[0], bbox[3], bbox[2])
@@ -454,5 +460,4 @@ class TestDataset(Dataset):
             for i in range(4):
                 bbox.append(int(bboxcoord[i]))
             bboxfile.close()
-    
         return bbox        

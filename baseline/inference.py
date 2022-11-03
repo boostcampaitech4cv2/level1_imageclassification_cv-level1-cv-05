@@ -11,6 +11,8 @@ from torch.utils.data import DataLoader
 
 from dataset import TestDataset, MaskBaseDataset
 
+from tqdm import tqdm
+
 
 def load_model(saved_model, num_classes, device):
     model_cls = getattr(import_module("model"), args.model)
@@ -61,7 +63,7 @@ def inference(data_dir, model_dir, output_dir, args, usebbox):
     preds = []
     softmax = nn.Softmax(dim=1)
     with torch.no_grad():
-        for idx, images in enumerate(loader):
+        for idx, images in enumerate(tqdm(loader)):
             images = images.to(device)
             pred = model(images)
             if args.voting_type == 'hard':
@@ -69,6 +71,7 @@ def inference(data_dir, model_dir, output_dir, args, usebbox):
             elif args.voting_type == 'soft':
                 pred = softmax(pred)
             preds.extend(pred.cpu().numpy())
+
     if args.voting_type == 'hard':
         info['ans'] = preds
     elif args.voting_type == 'soft':
@@ -88,14 +91,14 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     # Data and model checkpoints directories
-    parser.add_argument('--batch_size', type=int, default=1000, help='input batch size for validing (default: 1000)')
-    parser.add_argument('--resize', type=tuple, default=(96, 128), help='resize size for image when you trained (default: (96, 128))')
-    parser.add_argument('--model', type=str, default='BaseModel', help='model type (default: BaseModel)')
-    parser.add_argument('--usebbox', type=str, default='no', help='use bounding box (default: no  (no, yes))')
+    parser.add_argument('--batch_size', type=int, default=64, help='input batch size for validing (default: 1000)')
+    parser.add_argument('--resize', type=tuple, default=(384,384), help='resize size for image when you trained (default: (96, 128))')
+    parser.add_argument('--model', type=str, default='SwinTransformerV2', help='model type (default: BaseModel)')
+    parser.add_argument('--usebbox', type=str, default='yes', help='use bounding box (default: no (no, yes))')
 
     # Container environment
     parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_EVAL', '/opt/ml/input/data/eval'))
-    parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_CHANNEL_MODEL', '/opt/ml/mask-project/baseline/model/exp_stratified_with_ViT_Augment_only_ColorJitter_old_label_55'))
+    parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_CHANNEL_MODEL', '/opt/ml/model/Swin_Large_Weighted_Stratified_bbox_rem_58'))
     parser.add_argument('--output_dir', type=str, default=os.environ.get('SM_OUTPUT_DATA_DIR', './output'))
     parser.add_argument('--voting_type', type=str, default='hard', help='Output value type (soft or hard) (defalut: hard)')
 
