@@ -109,11 +109,11 @@ Naver BoostCamp AI Tech 4기 CV-5조 마스크 착용 상태 분류 프로젝트
 
 ### 💡 Result
 
-- Public Leaderboard
+- 🥈 Public Leaderboard
 
   <img src="./image/public_score.png" alt="f1_score" style="zoom:60%;" />
 
-- Private Leaderboard
+- 🥈 Private Leaderboard
 
   <img src="./image/private_score.png" alt="f1_score" style="zoom:60%;" />
 
